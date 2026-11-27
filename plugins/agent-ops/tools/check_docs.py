@@ -24,7 +24,7 @@ from pathlib import Path
 from urllib.parse import unquote
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _project import load_config, mgmt_rel  # noqa: E402
+from _project import is_moved, load_config, mgmt_rel  # noqa: E402
 
 # Defaults; override per project in `.agent-ops.toml` [check_docs] scan_dirs / dup_scope / dup_allowlist.
 SCAN_DIRS = ("management", "docs")  # first entry is replaced by the configured management dir
@@ -148,7 +148,7 @@ def _link_problem(path: Path, target: str, cache: dict[Path, set[str]]) -> str |
     file_part, _, anchor = unquote(target).partition("#")
     dest = (path.parent / file_part).resolve() if file_part else path
     if not dest.exists():
-        return "link hỏng, không có file"
+        return None if is_moved(dest) else "link hỏng, không có file"
     if anchor and dest.is_file() and dest.suffix == ".md":
         if dest not in cache:
             cache[dest] = anchors_of(dest.read_text(encoding="utf-8"))

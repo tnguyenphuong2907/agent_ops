@@ -18,7 +18,7 @@ import unicodedata
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _project import load_config, mgmt_dir, mgmt_rel, project_root  # noqa: E402
+from _project import is_moved, load_config, mgmt_dir, mgmt_rel, project_root  # noqa: E402
 
 ROOT = project_root()
 DR_DIR = mgmt_dir(ROOT) / "decision-requests"
@@ -139,6 +139,8 @@ def check_links(meta: dict) -> list[str]:
         file_part, _, anchor = target.partition("#")
         f = (path.parent / file_part).resolve() if file_part else path
         if not f.exists():
+            if is_moved(f):
+                continue
             problems.append(f"link hỏng: {target}")
             continue
         if anchor and f.suffix == ".md":

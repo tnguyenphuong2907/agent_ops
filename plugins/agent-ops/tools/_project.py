@@ -50,3 +50,17 @@ def mgmt_rel(root: Path | None = None) -> str:
 def mgmt_dir(root: Path | None = None) -> Path:
     root = root or project_root()
     return root / mgmt_rel(root)
+
+
+def moved_paths(root: Path | None = None) -> list[Path]:
+    """Absolute prefixes listed in `[links] moved` of `.agent-ops.toml`.
+
+    Files under these prefixes moved into the plugin; old links to them stay valid history.
+    """
+    root = root or project_root()
+    return [(root / str(p)).resolve() for p in load_config(root).get("links", {}).get("moved", [])]
+
+
+def is_moved(dest: Path, root: Path | None = None) -> bool:
+    dest = dest.resolve()
+    return any(dest == m or m in dest.parents for m in moved_paths(root))
