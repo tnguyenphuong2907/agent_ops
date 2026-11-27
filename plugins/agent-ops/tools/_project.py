@@ -8,7 +8,7 @@ Config: `.agent-ops.toml` at the project root, e.g.
     management = "management"                         # default
     [merge]
     base = "main"                                     # default
-    required_checks = []                              # check-run names a PR must have (default: none)
+    required_checks = []                              # check-run names a PR must have; merge_pr needs this key, even if empty
 """
 from __future__ import annotations
 
@@ -49,18 +49,28 @@ class ConfigError(Exception):
     """`.agent-ops.toml` cannot be trusted for a gate."""
 
 
-def merge_settings(root: Path | None = None) -> tuple[str, list[str]]:
+def merge_settings(root: Path | None = None) -> tuple[str, list[str] | None]:
     """(base branch, required check names) from `[merge]`. Strict: these drive merge gates.
 
     Unlike `load_config`, a file that exists but cannot be read or parsed raises, so a typo never
-    silently drops a required check. A missing file means the defaults.
+    silently drops a required check. A missing file means the default base branch.
+    `required_checks` is None when not declared, so a merge gate can tell it apart from an explicit [].
     """
     path = (root or project_root()) / CONFIG_NAME
     try:
-        config = tomllib.loads(path.read_text(encoding="utf-8"))
+        text = path.read_text(encoding="utf-8")
     except FileNotFoundError:
-        config = {}
-    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as e:
+        text = ""
+    except (OSError, UnicodeDecodeError) as e:
+        raise ConfigError(f"không đọc được {CONFIG_NAME}: {e}") from e
+    return parse_merge_settings(text)
+
+
+def parse_merge_settings(text: str) -> tuple[str, list[str] | None]:
+    """`merge_settings` on the config text itself (e.g. read from a git ref)."""
+    try:
+        config = tomllib.loads(text)
+    except tomllib.TOMLDecodeError as e:
         raise ConfigError(f"không đọc được {CONFIG_NAME}: {e}") from e
     section = config.get("merge", {})
     if not isinstance(section, dict):
@@ -69,10 +79,10 @@ def merge_settings(root: Path | None = None) -> tuple[str, list[str]]:
     if unknown:
         raise ConfigError(f"{CONFIG_NAME}: [merge] có khoá lạ: {', '.join(unknown)}")
     base = section.get("base", DEFAULT_BASE_BRANCH)
-    checks = section.get("required_checks", [])
+    checks = section.get("required_checks")
     if not isinstance(base, str) or not base.strip():
         raise ConfigError(f"{CONFIG_NAME}: merge.base phải là chuỗi không rỗng")
-    if not isinstance(checks, list) or not all(isinstance(c, str) and c for c in checks):
+    if checks is not None and (not isinstance(checks, list) or not all(isinstance(c, str) and c for c in checks)):
         raise ConfigError(f"{CONFIG_NAME}: merge.required_checks phải là danh sách tên check")
     return base.strip(), checks
 

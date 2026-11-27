@@ -48,6 +48,32 @@ class InitProject(unittest.TestCase):
         self.assertNotIn("tạo ", res.stdout)
         self.assertEqual((self.root / "management" / "README.md").read_text(encoding="utf-8"), "mine\n")
 
+    def test_base_ignores_feature_branch(self):
+        git = ["git", "-C", str(self.root), "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
+        subprocess.run([*git, "checkout", "-q", "-b", "main"], check=True)
+        subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "i"], check=True)
+        subprocess.run([*git, "checkout", "-q", "-b", "feat/x"], check=True)
+        run(self.root, "init_project.py")
+        self.assertIn('base = "main"', (self.root / ".agent-ops.toml").read_text(encoding="utf-8"))
+
+    def test_symlink_outside_project_rejected(self):
+        with tempfile.TemporaryDirectory() as outside:
+            (self.root / ".claude").symlink_to(outside)
+            self.assertEqual(run(self.root, "init_project.py").returncode, 2)
+            self.assertEqual(list(Path(outside).iterdir()), [])
+
+    def test_dangling_symlink_kept(self):
+        (self.root / ".claude").mkdir()
+        target = self.root.parent / f"{self.root.name}-dangling"
+        (self.root / ".claude" / "project-profile.md").symlink_to(target)
+        self.assertEqual(run(self.root, "init_project.py").returncode, 0)
+        self.assertFalse(target.exists())
+
+    def test_comment_only_config_accepted_and_unsafe_value_rejected(self):
+        self.assertEqual(run(self.root, "init_project.py", "--base", 'a"b').returncode, 2)
+        (self.root / ".agent-ops.toml").write_text("# empty\n", encoding="utf-8")
+        self.assertEqual(run(self.root, "init_project.py").returncode, 0)
+
     def test_broken_config_stops(self):
         (self.root / ".agent-ops.toml").write_text("[merge\n", encoding="utf-8")
         self.assertEqual(run(self.root, "init_project.py").returncode, 2)

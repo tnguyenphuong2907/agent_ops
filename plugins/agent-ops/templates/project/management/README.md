@@ -3,6 +3,7 @@
 Toàn bộ công việc của dự án được quản lý bằng file Markdown trong thư mục này. Mọi agent đọc/ghi trực tiếp, lịch sử thay đổi nằm trong Git.
 
 ## 1. Cấu trúc thư mục
+File hoặc thư mục chưa có sau khi khởi tạo (`risks.md`, `daily/`, `sprints/`, `change-requests/`, `archive/`, `retros/`) được tạo khi cần.
 
 ```
 management/

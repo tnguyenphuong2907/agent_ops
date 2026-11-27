@@ -47,7 +47,7 @@ management = "management"                         # thư mục quản lý (mặc
 
 [merge]
 base = "main"                                     # nhánh đích của ct / mp
-required_checks = []                              # tên check CI bắt buộc, vd. ["scan"]; mặc định: không bắt buộc check nào theo tên
+required_checks = []                              # tên check CI bắt buộc, vd. ["scan"]; mp bắt buộc có khoá này trên origin/<base> ([] = không bắt buộc check nào)
 
 [inbox]
 no_review_conclusion_exempt_ids = []              # DR được miễn kết luận phản biện

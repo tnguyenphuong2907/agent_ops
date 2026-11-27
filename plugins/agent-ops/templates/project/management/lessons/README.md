@@ -13,7 +13,7 @@
 | `IMPACT` | Thiếu hệ quả / `affects`; PO duyệt ngầm một quy tắc không được nêu; phụ thuộc vào việc chưa ai được giao | sửa ADR đã duyệt mà tóm tắt không nói |
 | `SCOPE` | Lọt hoặc thiếu phạm vi | thêm tính năng không nằm trong phương án |
 | `ESTIMATE` | Ước lượng công sức / chi phí / thời gian lệch | "0,5 ngày" cho việc của 4 endpoint |
-| `DOMAIN` | Thiếu hiểu biết nghiệp vụ / sư phạm | đề xuất đúng kỹ thuật nhưng sai với cách người dùng làm việc |
+| `DOMAIN` | Thiếu hiểu biết nghiệp vụ | đề xuất đúng kỹ thuật nhưng sai với cách người dùng làm việc |
 | `SEC` | Bảo mật, dữ liệu cá nhân | |
 | `CLARITY` | Mơ hồ, nhiều cách hiểu, không rõ áp dụng khi nào | |
 | `PROC` | Sai quy trình (trạng thái, quyền theo mục, vòng đời phiếu, tự nghiệm thu) | |

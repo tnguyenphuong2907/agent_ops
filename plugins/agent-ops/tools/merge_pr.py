@@ -8,7 +8,8 @@ is the PO's explicit OK to merge. A PR that fails a gate is skipped with a reaso
 Gates per open PR: not draft, targets the base branch (`[merge] base`, default main); every task in the branch name has status `done` on the PR
 branch; conflicts only in generated files (BOARD, INBOX) are resolved by regenerating them; every check
 run of the exact head SHA is completed and green, and every name in
-`[merge] required_checks` is present. An unreadable `.agent-ops.toml` stops the run.
+`[merge] required_checks` is present. The list is read from `.agent-ops.toml` on origin/<base>; the run stops
+when that file is unreadable or does not declare the key (write `required_checks = []` to require none).
 Standard library only; shells out to git and gh.
 """
 from __future__ import annotations
@@ -23,7 +24,7 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _project import ConfigError, merge_settings, mgmt_rel, project_root  # noqa: E402
+from _project import CONFIG_NAME, ConfigError, merge_settings, mgmt_rel, parse_merge_settings, project_root  # noqa: E402
 
 REPO = project_root()
 os.environ.setdefault("AGENT_OPS_PROJECT_DIR", str(REPO))  # child tools find the project
@@ -203,6 +204,19 @@ def delete_local(branch: str) -> str:
     return "merge tay, đã xoá nhánh local"
 
 
+def gate_checks(base: str) -> list[str]:
+    """Required check names as committed on origin/<base>: no checked-out or unpushed config can loosen them."""
+    res = sh("git", "show", f"origin/{base}:{CONFIG_NAME}", check=False)
+    if res.returncode != 0:
+        raise ConfigError(f"origin/{base} không có {CONFIG_NAME}; commit file có `[merge] required_checks` lên {base}")
+    remote_base, required = parse_merge_settings(res.stdout)
+    if remote_base != base:
+        raise ConfigError(f"merge.base trên origin/{base} là {remote_base}, khác {base} ở cây làm việc")
+    if required is None:
+        raise ConfigError(f"origin/{base}:{CONFIG_NAME} chưa khai `[merge] required_checks` (ghi [] nếu không bắt buộc check nào)")
+    return required
+
+
 def targets(args: list[str], base: str) -> list[int]:
     if args:
         return sorted({int(a.lstrip("#")) for a in args})
@@ -228,9 +242,8 @@ def main(argv: list[str]) -> int:
         return 2
     sh("git", "switch", base)
     sh("git", "fetch", "--prune", "origin")
-    sh("git", "merge", "--ff-only", f"origin/{base}")
-    try:  # gates come from the up-to-date base branch, not from whatever branch was checked out
-        required = merge_settings(REPO)[1]
+    try:
+        required = gate_checks(base)
     except ConfigError as e:
         print(f"Dừng: {e}")
         return 2
