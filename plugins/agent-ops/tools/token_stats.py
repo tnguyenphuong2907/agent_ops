@@ -8,9 +8,9 @@ Usage:
 
 Reads `<transcripts>/<session>/subagents/agent-*.jsonl` (+ `.meta.json` for agent type and model).
 One API response can span several transcript lines, so usage is counted once per message id.
-Context-fill metrics (D-217): tokens of tool output from reading task.md (Read or cat/sed/head/tail in Bash),
+Context-fill metrics: tokens of tool output from reading task.md (Read or cat/sed/head/tail in Bash),
 from grep, and count of CLAUDE.md re-reads; tokens estimated as characters / 4.
-Main session (D-218): `<transcripts>/*.jsonl`; per-call context, share of calls and of context tokens above
+Main session: `<transcripts>/*.jsonl`; per-call context, share of calls and of context tokens above
 MAIN_CTX_LIMIT (the ctx_guard.py hook threshold).
 Cost share uses prices relative to base input: cache read x0.1, cache write x1.25, output x5
 (same weights for every model; a rough split, not a bill). Standard library only.
@@ -181,7 +181,7 @@ def render_main(transcripts: Path, since: str | None) -> str:
     ctx = sorted(c for s, _ in sessions for c in s)
     big = [c for c in ctx if c > MAIN_CTX_LIMIT]
     return "\n".join([
-        "", "## Phiên chính (D-218)", "",
+        "", "## Phiên chính", "",
         f"- Phiên: {len(sessions)}; gọi model: {len(ctx)} (trung vị/phiên {statistics.median(len(s) for s, _ in sessions):g})",
         f"- Ngữ cảnh mỗi lần gọi: trung vị {int(statistics.median(ctx)):,}, p90 {ctx[int(len(ctx) * 0.9)]:,}, cao nhất {ctx[-1]:,}",
         f"- Gọi khi ngữ cảnh > {MAIN_CTX_LIMIT // 1000}K: {len(big) / len(ctx):.0%} số lần gọi, {sum(big) / sum(ctx):.0%} token ngữ cảnh",
@@ -208,7 +208,7 @@ def render(runs: list[dict], by: str) -> str:
         "- Tỷ trọng chi phí ước tính: " + ", ".join(
             f"{name} {sum(r[k] for r in runs) * w / cost:.0%}"
             for k, w, name in (("cache_read", 0.1, "đọc cache"), ("cache_write", 1.25, "ghi cache"), ("output", 5.0, "đầu ra"))),
-        f"- Ngữ cảnh do tool trả (ước tính, D-217): đọc `task.md` {sum(r['task_md'] for r in runs):,} "
+        f"- Ngữ cảnh do tool trả (ước tính): đọc `task.md` {sum(r['task_md'] for r in runs):,} "
         f"(trung vị/lượt {int(statistics.median(r['task_md'] for r in runs)):,}) · grep {sum(r['grep'] for r in runs):,} "
         f"(trung vị/lượt {int(statistics.median(r['grep'] for r in runs)):,}) · đọc lại `CLAUDE.md` {sum(r['claude_md_reads'] for r in runs)} lần",
         "",

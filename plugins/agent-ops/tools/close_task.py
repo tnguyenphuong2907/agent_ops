@@ -1,4 +1,4 @@
-"""Close a task when review is Approved and QA Passed, without a model (D-219, token optimisation).
+"""Close a task when review is Approved and QA Passed, without a model (token optimisation).
 
 Usage: python3 "${CLAUDE_PLUGIN_ROOT}/tools/close_task.py" [TASK-ID]
   No TASK-ID: taken from the current branch name when it names exactly one task.
@@ -19,7 +19,7 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _project import mgmt_rel, project_root  # noqa: E402
+from _project import ConfigError, merge_settings, mgmt_rel, project_root  # noqa: E402
 
 REPO = project_root()
 os.environ.setdefault("AGENT_OPS_PROJECT_DIR", str(REPO))  # child tools find the project
@@ -163,8 +163,13 @@ def main(argv: list[str]) -> int:
     fm = frontmatter(text)
 
     fails: list[str] = []
-    if branch == "main" or tid not in branch:
-        fails.append(f"nhánh hiện tại `{branch}` phải khác main và chứa {tid}")
+    try:
+        base = merge_settings(REPO)[0]
+    except ConfigError as e:
+        print(f"Dừng: {e}")
+        return 2
+    if branch == base or tid not in branch:
+        fails.append(f"nhánh hiện tại `{branch}` phải khác {base} và chứa {tid}")
     dirty = [l[3:] for l in out("git", "status", "--porcelain", "--untracked-files=no").splitlines()]
     dirty = [p for p in dirty if not p.startswith(rel(tdir) + "/")]
     if dirty:

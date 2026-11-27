@@ -1,0 +1,13 @@
+# agent-ops plugin config (see the plugin README).
+[paths]
+management = "{management}"
+
+[check_docs]
+scan_dirs = ["{management}", "docs"]
+dup_scope = ["CLAUDE.md", ".claude/skills"]
+
+# Gates of `mp` / merge_pr.py. List the check-run names every PR must have, e.g. ["scan"].
+# merge_pr.py reads this from origin/<base> and stops if the key is missing: commit and push it.
+[merge]
+base = "{base}"
+required_checks = []

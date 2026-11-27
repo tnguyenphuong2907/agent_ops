@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate management/BOARD.md from task/epic frontmatter and decision tickets (D-133, E01-T31).
+"""Generate management/BOARD.md from task/epic frontmatter and decision tickets.
 
 Usage: python3 management/tools/build_board.py            # rewrite BOARD.md
        python3 management/tools/build_board.py --check    # rc 1 if BOARD.md differs from the generated text
@@ -139,8 +139,8 @@ def generate(root: Path, pm_block: str) -> str:
     out = [
         "# Bảng công việc",
         "",
-        f"> **Sinh tự động** bằng `python3 {mgmt_rel(root)}/tools/build_board.py` từ frontmatter `task.md`, `epic.md` và phiếu DR "
-        f"(D-133). Không sửa tay, trừ khối ghi chú của PM giữa `{PM_BEGIN}` và `{PM_END}` (được giữ nguyên khi sinh lại).",
+        f"> **Sinh tự động** bằng `build_board.py` (plugin agent-ops) từ frontmatter `task.md`, `epic.md` và phiếu DR "
+        f"trong `{mgmt_rel(root)}/`. Không sửa tay, trừ khối ghi chú của PM giữa `{PM_BEGIN}` và `{PM_END}` (được giữ nguyên khi sinh lại).",
         "",
         *epic_section(load_epics(root), tasks),
         "",

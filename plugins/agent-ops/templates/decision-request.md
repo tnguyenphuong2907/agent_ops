@@ -4,7 +4,7 @@ title: "<Câu hỏi ngắn, kết thúc bằng dấu ?>"
 type:                 # 1 | 2  (architect đề xuất theo decision-policy.md; reviewer xác nhận)
 policy_rule:          # ví dụ 1.5 (bảo mật) hoặc 2 (tham số kỹ thuật)
 status: draft         # draft | in_review | open | provisional | decided | withdrawn
-topic:                # scope | security | cost | architecture | data | learning | ops | ux
+topic:                # scope | security | cost | architecture | data | ops | ux, hoặc [inbox.topics] trong .agent-ops.toml
 asked_by:
 proposal_by: architect
 reviewer: decision-reviewer
@@ -54,7 +54,7 @@ Phân loại: **Loại _**, theo quy tắc `decision-policy.md` mục _.
 - Quyết định liên quan:
 - Tài liệu trong repo:
 - Nguồn ngoài:
-- Ý kiến product-analyst (bắt buộc khi `topic: learning`; ghi "không áp dụng" nếu topic khác): <tóm tắt ý kiến, ngày, link>
+- Ý kiến product-analyst (bắt buộc khi topic nằm trong `analyst_topics`; ghi "không áp dụng" nếu topic khác): <tóm tắt ý kiến, ngày, link>
 
 ## 6. Ảnh hưởng nếu chọn  ·  _architect_
 | Phương án | Task/file thay đổi | Công sức thêm | Ghi chú |

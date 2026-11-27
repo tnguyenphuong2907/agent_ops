@@ -1,4 +1,4 @@
-"""Consistency checks over management/ and docs/ markdown (origin D-133). Stdlib only; called by build_inbox.py --check.
+"""Consistency checks over management/ and docs/ markdown. Stdlib only; called by build_inbox.py --check.
 
 - relative links must point to an existing file or directory, and `#anchor` to an existing heading (GitHub slug rules);
 - BOARD.md must equal the regenerated text (see build_board.py);
@@ -6,10 +6,10 @@
 - warning: an item of the inbox "Việc bạn cần làm" (manual) section whose tasks are all `done`, that names an unknown
   task, or that names no task at all (allowed only with the marker `(không task)`).
 
-- error (origin D-142 P2, D-154): a passage of >= 12 words shared by >= 2 files of `[check_docs] dup_scope` in
+- error : a passage of >= 12 words shared by >= 2 files of `[check_docs] dup_scope` in
   `.agent-ops.toml` (first entry a file, the rest directories; default `CLAUDE.md`, `.claude/skills/`; copies break the single-source rule). Compared with a sliding 12-word window over
   normalized words (sentence punctuation, `->`, bold/italic/code markers, bullets and case ignored), so differently cut
-  sentences still match (LL-014); adjacent windows merge into one passage. Known passages live in `[[check_docs.dup_allowlist]]`, keyed by
+  sentences still match; adjacent windows merge into one passage. Known passages live in `[[check_docs.dup_allowlist]]`, keyed by
   (file pair, first 12 words), kind `có chủ đích` or `nợ` (`nợ` names the cleanup task and deadline); an entry that matches
   nothing is an error too, so editing the start of a passage or cleaning it forces the entry to be updated or removed.
 
@@ -45,10 +45,9 @@ DUP_SCOPE = ("CLAUDE.md", ".claude/skills")  # first entry: a single file; the o
 DUP_MIN_WORDS = 12
 MARKUP_RE = re.compile(r"[*_`~]+|^\s*(?:[-+>]|\d+[.)])\s+|\[([^\]]*)\]\([^)]*\)")
 PUNCT_RE = re.compile(r"[.!?;:,→]+")
-DEBT_TASK, DEBT_DEADLINE = "E01-T54", "trước G3"
 KIND_INTENTIONAL, KIND_DEBT = "có chủ đích", "nợ"
 # Passages shared on purpose or still owed, keyed by (file pair, first 12 words). Generated with find_duplicate_passages();
-# D-154: entries may only be removed, never added (test_duplicate_allowlist_only_shrinks). `nợ` entries name the cleanup task and deadline.
+# Entries should only be removed over time, never added. `nợ` entries name the cleanup task and deadline.
 def _load_sibling(name: str):
     """Import a sibling tool by path: `python -I` drops the script directory from sys.path."""
     path = Path(__file__).resolve().parent / f"{name}.py"
@@ -245,7 +244,7 @@ def segments_of(text: str) -> list[list[str]]:
 def passages_of(text: str) -> dict[str, int]:
     """Passages of >= DUP_MIN_WORDS words as {first window (12 words): word count}; adjacent windows merge into one passage.
 
-    Windows ignore sentence boundaries, so the same text cut into different sentences is still one passage (LL-014).
+    Windows ignore sentence boundaries, so the same text cut into different sentences is still one passage.
     """
     return {" ".join(words[i : i + DUP_MIN_WORDS]): n for words, i, n in _runs(text, None)}
 
@@ -307,7 +306,7 @@ def normalize_start(start: str) -> str:
 
 
 def check_duplicate_sentences(root: Path, allowlist: list[dict[str, str | tuple[str, str]]] | None = None) -> list[str]:
-    """Errors for passages of >= 12 words shared by >= 2 files of the rule-doc scope (sliding window, D-154).
+    """Errors for passages of >= 12 words shared by >= 2 files of the rule-doc scope (sliding window).
 
     An allowlist entry (files + start of passage) silences one passage; an entry that matches nothing is an error too
     (the passage was edited or cleaned: update or delete the entry).
