@@ -4,10 +4,30 @@ Plugin Claude Code dùng lại hệ thống quản lý cho đội agent: bảng 
 
 ## Cài đặt
 
+Từ GitHub (khuyên dùng), gõ trong Claude Code:
+
 ```
-/plugin marketplace add /home/dragon/dev/agent-ops
+/plugin marketplace add tnguyenphuong2907/agent_ops
 /plugin install agent-ops@agent-ops-local
 ```
+
+Từ bản clone ở máy (khi đang phát triển plugin):
+
+```
+git clone https://github.com/tnguyenphuong2907/agent_ops.git agent-ops
+/plugin marketplace add ./agent-ops
+/plugin install agent-ops@agent-ops-local
+```
+
+Clone vào thư mục `agent-ops` để khớp với `plugin_path` mẫu bên dưới.
+
+Cập nhật lên bản mới nhất:
+
+```
+/plugin marketplace update agent-ops-local
+```
+
+Gỡ cài đặt: `/plugin uninstall agent-ops@agent-ops-local`.
 
 ## Cấu hình dự án
 
