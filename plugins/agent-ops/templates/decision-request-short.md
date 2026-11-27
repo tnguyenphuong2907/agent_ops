@@ -5,7 +5,7 @@ form: short           #phiếu ngắn. Chỉ dùng khi tích được đủ 5 đ
 type: 2               # phiếu ngắn luôn là loại 2 (kể cả siết nhất quán thuộc bảo mật)
 policy_rule:          # "2 (siết nhất quán, D-xxx)" hoặc "2 (<nhóm loại 2>)"
 status: draft         # draft | in_review | provisional | decided | withdrawn  (không có open)
-topic:                # scope | security | cost | architecture | data | learning | ops | ux
+topic:                # scope | security | cost | architecture | data | ops | ux, hoặc [inbox.topics] trong .agent-ops.toml
 asked_by:
 proposal_by: architect
 reviewer: decision-reviewer

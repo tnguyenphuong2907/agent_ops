@@ -1,4 +1,4 @@
-"""Tests for build_inbox D-216: the 'phương án lai' line must name an option letter present in the options table."""
+"""Tests for build_inbox P-LAI: the 'phương án lai' line must name an option letter present in the options table."""
 import sys
 import tempfile
 import unittest
@@ -23,7 +23,7 @@ def make(line=f"{LABEL} có: C là lai", *, table=TABLE, created="2026-11-20", s
 
 
 def errs(meta):
-    return [m for m in bi.check_hybrid_line(meta) if "D-216" in m]
+    return [m for m in bi.check_hybrid_line(meta) if "P-LAI" in m]
 
 
 class HybridLine(unittest.TestCase):

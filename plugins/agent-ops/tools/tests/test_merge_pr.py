@@ -40,14 +40,17 @@ class Frontmatter(unittest.TestCase):
 class CiVerdict(unittest.TestCase):
     def test_green(self):
         self.assertIsNone(mp.ci_verdict([{"name": "scan", "conclusion": "success"},
-                                         {"name": "fe", "conclusion": "skipped"}]))
+                                         {"name": "fe", "conclusion": "skipped"}], ["scan"]))
 
     def test_missing_scan(self):
-        self.assertIn("scan", mp.ci_verdict([{"name": "be", "conclusion": "success"}]))
+        self.assertIn("scan", mp.ci_verdict([{"name": "be", "conclusion": "success"}], ["scan"]))
+
+    def test_no_required_checks(self):
+        self.assertIsNone(mp.ci_verdict([{"name": "be", "conclusion": "success"}], []))
 
     def test_failure(self):
         self.assertIn("be=failure", mp.ci_verdict([{"name": "scan", "conclusion": "success"},
-                                                   {"name": "be", "conclusion": "failure"}]))
+                                                   {"name": "be", "conclusion": "failure"}], ["scan"]))
 
 
 class ShortcutPattern(unittest.TestCase):

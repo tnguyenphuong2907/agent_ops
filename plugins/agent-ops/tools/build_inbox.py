@@ -24,38 +24,43 @@ ROOT = project_root()
 DR_DIR = mgmt_dir(ROOT) / "decision-requests"
 INBOX = mgmt_dir(ROOT) / "DECISIONS-INBOX.md"
 MANUAL_START, MANUAL_END = "<!-- manual:start -->", "<!-- manual:end -->"
-TOPICS = {
+DEFAULT_TOPICS = {
     "scope": "Phạm vi", "security": "Bảo mật", "cost": "Chi phí", "architecture": "Kiến trúc",
-    "data": "Dữ liệu người dùng", "learning": "Trải nghiệm học", "ops": "Vận hành", "ux": "Giao diện",
+    "data": "Dữ liệu người dùng", "ops": "Vận hành", "ux": "Giao diện",
 }
-DOSSIER_SINCE = "2026-11-07"  # D-109: phiếu tạo từ ngày này phải có mục 10 hồ sơ cho PO
-# D-112: PO waived the section-7 reviewer conclusion for this single DR (it predates the rule and is not edited).
+_INBOX_CONFIG = load_config(ROOT).get("inbox", {})
+# `.agent-ops.toml` [inbox.topics] replaces the whole default list (key -> group title in the inbox).
+TOPICS = {str(k).lower(): str(v) for k, v in _INBOX_CONFIG.get("topics", {}).items()} or dict(DEFAULT_TOPICS)
+# [inbox] analyst_topics: DRs with one of these topics need a product-analyst opinion in section 5 (P6).
+ANALYST_TOPICS = frozenset(str(t).lower() for t in _INBOX_CONFIG.get("analyst_topics", []))
+DOSSIER_SINCE = "2026-11-07"  # phiếu tạo từ ngày này phải có mục 10 hồ sơ cho PO
+# DRs for which the PO waived the section-7 reviewer conclusion (e.g. written before the rule).
 # Only the error "chưa có kết luận phản biện (mục 7)" is waived, only for these ids; every other rule still applies.
-# Per-project list: `.agent-ops.toml` [inbox] no_review_conclusion_exempt_ids = ["DR-014"].
-NO_REVIEW_CONCLUSION_EXEMPT_IDS = frozenset(load_config(ROOT).get("inbox", {}).get("no_review_conclusion_exempt_ids", []))
-LOOP_GUARDS_SINCE = "2026-11-07"  # D-110: R1, R2 apply to DRs created AFTER this date (PO approval day)
+# Per-project list: `.agent-ops.toml` [inbox] no_review_conclusion_exempt_ids = ["DR-<nnn>"].
+NO_REVIEW_CONCLUSION_EXEMPT_IDS = frozenset(_INBOX_CONFIG.get("no_review_conclusion_exempt_ids", []))
+LOOP_GUARDS_SINCE = "2026-11-07"  # R1, R2 apply to DRs created AFTER this date
 VALID_STATUS = {"draft", "in_review", "open", "provisional", "decided", "withdrawn"}
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 OPTION_RE = re.compile(r"^[A-Z][′'0-9]*$")
 OPTION_COL_RE = re.compile(r"^([A-Z][′'0-9]*)(?=[.\s:)]|$)")
 MAX_REVIEW_ROUNDS = 2
 R1_LABELS = ("Bài toán gốc", "Ràng buộc bỏ được", "Phương án bỏ ràng buộc")
-P_RULES_SINCE = "2026-11-05"  # D-101 (DR-014 P2, P4, P6): apply to DRs created AFTER this date, status not withdrawn
+P_RULES_SINCE = "2026-11-05"  # P2, P4, P6: apply to DRs created AFTER this date, status not withdrawn
 P_RULES_SKIP_STATUS = {"withdrawn"}  # draft IS checked: skill decision-requests has the architect run --check to zero before in_review
 # Longest alternative first. A code is not matched when a word char follows it or a lowercase ASCII slug suffix
-# (so ADR-0002-slug.md is not a code). A code right after "<digit>-" still counts, so D-092-D-104 yields both codes,
-# but not right after a date: 2026-11-07-D-101 is a name, not a reference to D-101.
+# (so ADR-0002-slug.md is not a code). A code right after "<digit>-" still counts, so D-001-D-002 yields both codes,
+# but not right after a date: 2026-01-01-D-001 is a name, not a reference to D-001.
 REF_CODE_RE = re.compile(r"(?:(?<![\w-])|(?<=\d-))(?<!\d{4}-\d{2}-\d{2}-)(?>E\d{2}-T\d{2}-S\d{2}|E\d{2}-T\d{2}|E\d{2}|ADR-\d{4}|D-\d{3})(?!\w|-[a-z])")
 LINK_TARGET_RE = re.compile(r"(?<=\])\([^)\s]*\)")
 EXTERNAL_URL_RE = re.compile(r"https?://[^\s)>\]]+")
 INLINE_CODE_RE = re.compile(r"`[^`\n]*`")
 READ_LABEL_RE = re.compile(r"\[ngoài, đọc (\d{4}-\d{2}-\d{2})\]")  # S01 / skill decision-requests
 REQUIRED_SECTIONS_AFTER_DRAFT = ["## 2.", "## 3.", "## 4.", "## 5.", "## 6."]
-# D-116: short-form DR (`form: short`), template management/templates/decision-request-short.md.
+# Short-form DR (`form: short`), template templates/decision-request-short.md.
 SHORT_REQUIRED_SECTIONS = ["## 1.", "## 2.", "## 3.", "## 4.", "## 5."]
 SHORT_CONDITIONS = 5  # section 3 checklist: every box must be ticked once the ticket leaves draft
 SHORT_ESCALATE = "⬆️"  # reviewer verdict: conditions not met, convert to a full DR
-# D-135: a full-form type-2 DR must say why the short form does not fit. Applies to DRs created on/after this date.
+# A full-form type-2 DR must say why the short form does not fit. Applies to DRs created on/after this date.
 WHY_NOT_SHORT_SINCE = "2026-11-11"
 WHY_NOT_SHORT_RE = re.compile(r"^\*\*Vì sao không phiếu ngắn:\*\*[ \t]*(.*)$", re.M)
 
@@ -164,7 +169,7 @@ def topics_of(meta: dict) -> list[str]:
 
 
 def check_frontmatter(meta: dict) -> list[str]:
-    """E01-T18 / CR-18: malformed `created`, `status`, `topic` become problems, never crashes in later rules."""
+    """Malformed `created`, `status`, `topic` become problems, never crashes in later rules."""
     p: list[str] = []
     created = meta.get("created")
     if created is not None:
@@ -216,23 +221,23 @@ def validate(meta: dict) -> list[str]:
     if st == "provisional" and meta.get("type") == "1" and not meta["_review"].startswith("⬇️"):
         p.append("loại 1 chỉ được provisional khi reviewer kết luận ⬇️ (hạ loại)")
     if st in {"open", "provisional"} and (meta.get("created") or "") >= DOSSIER_SINCE and not meta["_dossier"]:
-        p.append("mục 10 'Hồ sơ quyết định cho PO' chưa điền (D-109)")
+        p.append("mục 10 'Hồ sơ quyết định cho PO' chưa điền")
     if (st not in {"draft", "withdrawn"} and meta.get("type") == "2"
             and (meta.get("created") or "") >= WHY_NOT_SHORT_SINCE):
         m = WHY_NOT_SHORT_RE.search(_strip_code_and_comments(_section(meta["_text"], "## 4.", "## 5.")))
         if not m or not m.group(1).strip() or re.search(r"<[^>]*>", m.group(1)):
-            p.append("loại 2 dùng phiếu đầy đủ: mục 4 thiếu dòng **Vì sao không phiếu ngắn:** (D-135)")
+            p.append("loại 2 dùng phiếu đầy đủ: mục 4 thiếu dòng **Vì sao không phiếu ngắn:**")
     if (meta.get("created") or "") >= DOSSIER_SINCE and "Đồng ý có điều kiện" in meta["_review"]:
-        p.append("kết luận 'Đồng ý có điều kiện' không còn dùng (D-109): chọn ✅ / 🔄 / ❓ / ⬇️")
+        p.append("kết luận 'Đồng ý có điều kiện' không còn dùng: chọn ✅ / 🔄 / ❓ / ⬇️")
     return p + check_links(meta)
 
 
 def validate_short(meta: dict) -> list[str]:
-    """D-116: rules for a short-form DR. Only type 2; reviewer checks the conditions once (✅ or ⬆️); no section 10."""
+    """Rules for a short-form DR. Only type 2; reviewer checks the conditions once (✅ or ⬆️); no section 10."""
     p: list[str] = []
     st, text = meta.get("status", ""), meta["_text"]
     if meta.get("type") != "2":
-        p.append("phiếu ngắn chỉ dùng cho loại 2 (type: 2), kể cả siết nhất quán (D-116)")
+        p.append("phiếu ngắn chỉ dùng cho loại 2 (type: 2), kể cả siết nhất quán")
     if st not in {"draft", "withdrawn"}:
         for sec in SHORT_REQUIRED_SECTIONS:
             if "\n" + sec not in text:
@@ -262,7 +267,7 @@ def _strip_code_and_comments(text: str) -> str:
 
 
 def review_rounds(text: str) -> int:
-    """D-110 R2: max (never sum) of the three round counters."""
+    """R2: max (never sum) of the three round counters."""
     sec7 = _strip_code_and_comments(_section(text, "## 7.", "## 8."))
     sec9 = _strip_code_and_comments(_section(text, "## 9.", "## 10."))
     history = text.split("\n## Lịch sử", 1)[1] if "\n## Lịch sử" in text else ""
@@ -274,7 +279,7 @@ def review_rounds(text: str) -> int:
 
 
 def check_loop_guards(meta: dict) -> list[str]:
-    """D-110 F7: R1 (section 3 opening lines) and R2 (round ceiling). Only for DRs created since LOOP_GUARDS_SINCE."""
+    """R1 (section 3 opening lines) and R2 (round ceiling). Only for DRs created since LOOP_GUARDS_SINCE."""
     created = _scalar(meta, "created")
     if not DATE_RE.match(created):
         return ["created thiếu hoặc sai dạng YYYY-MM-DD: không xác định được có áp R1, R2 hay không"]
@@ -304,7 +309,7 @@ def check_loop_guards(meta: dict) -> list[str]:
     if rounds > MAX_REVIEW_ROUNDS:
         p.append(f"R2: vòng {rounds} > {MAX_REVIEW_ROUNDS} (trần 2 vòng)")
     elif rounds == MAX_REVIEW_ROUNDS and meta.get("status") == "in_review":
-        p.append("R2: vòng 2 mà còn in_review: decision-reviewer điền mục 10, chuyển open/provisional (D-135)")
+        p.append("R2: vòng 2 mà còn in_review: decision-reviewer điền mục 10, chuyển open/provisional")
     return p
 
 
@@ -325,7 +330,7 @@ def _sections_with_line(text: str, first: str, last: str) -> tuple[int, str]:
 
 
 def _p_rules_text(meta: dict) -> str | None:
-    """Normalized text if D-101 P-rules apply to this DR (created after P_RULES_SINCE, not withdrawn), else None."""
+    """Normalized text if the P-rules apply to this DR (created after P_RULES_SINCE, not withdrawn), else None."""
     created = _scalar(meta, "created")
     if not DATE_RE.match(created) or created <= P_RULES_SINCE or _scalar(meta, "status") in P_RULES_SKIP_STATUS:
         return None
@@ -351,7 +356,7 @@ def _check_p4_line(line: str, lineno: int) -> list[str]:
 
 
 def check_reference_rules(meta: dict) -> list[str]:
-    """D-101 P2 (codes in sections 3-6 must be in affects/related, each code by itself) and P4 (each external URL in
+    """P2 (codes in sections 3-6 must be in affects/related, each code by itself) and P4 (each external URL in
     section 5 needs a read date). Only for DRs created after P_RULES_SINCE, not withdrawn. Invalid `created`
     is already reported by check_loop_guards. A missing section marker is reported, never skipped silently."""
     text = _p_rules_text(meta)
@@ -388,7 +393,7 @@ def _option_letter(token: str) -> str:
 
 
 def check_hybrid_line(meta: dict) -> list[str]:
-    """D-216 (DR-073): in section 3, the line 'Đã cân nhắc phương án lai / để sau?' starts with có/không; with
+    """In section 3, the line 'Đã cân nhắc phương án lai / để sau?' starts with có/không; with
     'có' it must name at least one option letter that is a column header of the options table in the same section.
     DRs without the line, withdrawn DRs, decided and superseded DRs are skipped (no false alarm on closed tickets)."""
     if _scalar(meta, "status") in {"decided", "superseded"}:
@@ -406,7 +411,7 @@ def check_hybrid_line(meta: dict) -> list[str]:
         value = m.group(1).strip().lstrip("*_ ").strip()
         head = re.match(r"(có|không)(?![^\W_])", value, re.I)
         if not head:
-            return [f"D-216: dòng {lineno}: 'phương án lai' phải bắt đầu bằng 'có' hoặc 'không'"]
+            return [f"P-LAI: dòng {lineno}: 'phương án lai' phải bắt đầu bằng 'có' hoặc 'không'"]
         if head.group(1).lower() == "không":
             return []
         header: set[str] = set()
@@ -419,20 +424,21 @@ def check_hybrid_line(meta: dict) -> list[str]:
                 header = found
                 break
         if not header:
-            return [f"D-216: dòng {lineno}: mục 3 không có bảng phương án với cột 'A.', 'B.'… để đối chiếu chữ cái"]
+            return [f"P-LAI: dòng {lineno}: mục 3 không có bảng phương án với cột 'A.', 'B.'… để đối chiếu chữ cái"]
         named = {_option_letter(t) for t in HYBRID_LETTER_RE.findall(value[head.end():])}
         if not named & header:
-            return [f"D-216: dòng {lineno}: trả lời 'có' nhưng không nêu chữ cái phương án nào có trong bảng ({', '.join(sorted(header))})"]
+            return [f"P-LAI: dòng {lineno}: trả lời 'có' nhưng không nêu chữ cái phương án nào có trong bảng ({', '.join(sorted(header))})"]
         return []
     return []
 
 
 PA_BULLET_RE = re.compile(r"^(\s*)[-*]\s+[*_]*Ý kiến product-analyst")  # `-`/`*`, indented, optional bold/italic
 # Exact hint and placeholder of templates/decision-request.md; nothing else is stripped as "template text".
-PA_GUIDANCE = '(bắt buộc khi `topic: learning`; ghi "không áp dụng" nếu topic khác)'
+PA_GUIDANCE = '(bắt buộc khi topic nằm trong `analyst_topics`; ghi "không áp dụng" nếu topic khác)'
+# Hint of earlier template versions, still present in existing DRs.
+PA_OLD_GUIDANCE = '(bắt buộc khi `topic: learning`; ghi "không áp dụng" nếu topic khác)'
 ISO_DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
 PA_PLACEHOLDER_RE = re.compile(r"<tóm tắt ý kiến[^>]*>")
-PA_LEARNING_MISSING = "topic learning cần dòng '- Ý kiến product-analyst' có nội dung"
 
 
 def _pa_bullet_value(lines: list[str], i: int, indent: int) -> str:
@@ -448,7 +454,7 @@ def _pa_bullet_value(lines: list[str], i: int, indent: int) -> str:
 
 
 def _pa_value_is_empty(raw: str) -> bool:
-    value = raw.replace(PA_GUIDANCE, "")
+    value = raw.replace(PA_GUIDANCE, "").replace(PA_OLD_GUIDANCE, "")
     value = PA_PLACEHOLDER_RE.sub("", value)
     value = ISO_DATE_RE.sub("", value)  # a date alone is not an opinion: "(2026-11-08): (không áp dụng)" is still empty
     if not re.search(r"\w", value):  # only punctuation / emphasis marks
@@ -457,22 +463,24 @@ def _pa_value_is_empty(raw: str) -> bool:
 
 
 def check_pa_opinion(meta: dict) -> list[str]:
-    """D-101 P6 (auto part): topic learning DRs created after P_RULES_SINCE need a filled product-analyst line in section 5."""
+    """P6 (auto part): DRs in ANALYST_TOPICS created after P_RULES_SINCE need a filled product-analyst line in section 5."""
     text = _p_rules_text(meta)
-    if text is None or "learning" not in topics_of(meta):
+    matched = sorted(ANALYST_TOPICS.intersection(topics_of(meta)))
+    if text is None or not matched:
         return []
+    label = "topic " + ", ".join(matched)
     start, sec5 = _sections_with_line(text, "## 5.", "## 6.")
     if not sec5:
-        return ["P6: thiếu mục 5; " + PA_LEARNING_MISSING]
+        return [f"P6: thiếu mục 5; {label} cần dòng '- Ý kiến product-analyst' có nội dung"]
     lines = sec5.splitlines()
     for offset, line in enumerate(lines):
         m = PA_BULLET_RE.match(line)
         if not m:
             continue
         if _pa_value_is_empty(_pa_bullet_value(lines, offset, len(m.group(1)))):
-            return [f"P6: dòng {start + offset}: topic learning nhưng ý kiến product-analyst để trống, còn mẫu hoặc 'không áp dụng'"]
+            return [f"P6: dòng {start + offset}: {label} nhưng ý kiến product-analyst để trống, còn mẫu hoặc 'không áp dụng'"]
         return []
-    return [f"P6: mục 5 (từ dòng {start}): topic learning thiếu dòng '- Ý kiến product-analyst'"]
+    return [f"P6: mục 5 (từ dòng {start}): {label} thiếu dòng '- Ý kiến product-analyst'"]
 
 
 def row_link(meta: dict) -> str:
@@ -527,7 +535,7 @@ def build(drs: list[dict]) -> str:
     out = [
         "# 📥 Hộp quyết định của Product Owner",
         "",
-        f"> Tự sinh bởi `python {mgmt_rel(ROOT)}/tools/build_inbox.py` — cập nhật {today}. **Không sửa tay**, trừ mục *Việc bạn cần làm*.",
+        f"> Tự sinh bởi `build_inbox.py` (plugin agent-ops) — cập nhật {today}. **Không sửa tay**, trừ mục *Việc bạn cần làm*.",
         "> Trả lời: `/decide DR-012 A, DR-013 đồng ý đề xuất` · Hỏi thêm: `/explain DR-012 <câu hỏi>`",
         "",
         f"**Cần bạn quyết:** {len(open_)} · **Quyết định tạm của agent:** {len(prov)} · **Đang soạn/phản biện:** {len(pipeline)}"
@@ -621,7 +629,7 @@ def main() -> int:
         for k, v in problems.items():
             for msg in v:
                 print(f"{k}: {msg}")
-        doc_errors, doc_warnings = _docs_checks().run(ROOT)  # D-133: links, BOARD, stale "đề xuất" lines
+        doc_errors, doc_warnings = _docs_checks().run(ROOT)  # links, BOARD, stale "đề xuất" lines
         for msg in doc_errors:
             print(msg)
         for msg in doc_warnings:

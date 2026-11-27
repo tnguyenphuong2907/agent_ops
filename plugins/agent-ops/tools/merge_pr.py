@@ -1,13 +1,14 @@
-"""Merge eligible PRs into main and clean up afterwards, without a model (D-219, token optimisation).
+"""Merge eligible PRs into the base branch and clean up afterwards, without a model (token optimisation).
 
 Usage: python3 "${CLAUDE_PLUGIN_ROOT}/tools/merge_pr.py" [PR ...]
-  No PR numbers: every open PR into main, plus merged PRs whose branch is still local.
+  No PR numbers: every open PR into the base branch, plus merged PRs whose branch is still local.
 Running this command (or typing `mp [PR ...]` in Claude Code, see hooks/scripts/task_shortcuts.py)
 is the PO's explicit OK to merge. A PR that fails a gate is skipped with a reason, never forced.
 
-Gates per open PR: not draft, base main; every task in the branch name has status `done` on the PR
+Gates per open PR: not draft, targets the base branch (`[merge] base`, default main); every task in the branch name has status `done` on the PR
 branch; conflicts only in generated files (BOARD, INBOX) are resolved by regenerating them; every check
-run of the exact head SHA is completed and green, and `scan` (gitleaks) is present.
+run of the exact head SHA is completed and green, and every name in
+`[merge] required_checks` is present. An unreadable `.agent-ops.toml` stops the run.
 Standard library only; shells out to git and gh.
 """
 from __future__ import annotations
@@ -22,7 +23,7 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _project import mgmt_rel, project_root  # noqa: E402
+from _project import ConfigError, merge_settings, mgmt_rel, project_root  # noqa: E402
 
 REPO = project_root()
 os.environ.setdefault("AGENT_OPS_PROJECT_DIR", str(REPO))  # child tools find the project
@@ -83,10 +84,12 @@ def frontmatter_status(text: str) -> str | None:
     return None
 
 
-def ci_verdict(runs: list[dict]) -> str | None:
+def ci_verdict(runs: list[dict], required: list[str]) -> str | None:
     """None when green; otherwise the reason to skip. `runs` are completed check runs."""
-    if not any(r.get("name") == "scan" for r in runs):
-        return "thiếu check `scan` (gitleaks)"
+    names = {r.get("name") for r in runs}
+    missing = [c for c in required if c not in names]
+    if missing:
+        return "thiếu check bắt buộc: " + ", ".join(f"`{c}`" for c in missing)
     bad = [r for r in runs if r.get("conclusion") not in OK_CONCLUSIONS]
     if bad:
         return "CI trượt: " + ", ".join(f"{r.get('name')}={r.get('conclusion')} {r.get('html_url', '')}" for r in bad)
@@ -101,7 +104,7 @@ def check_runs(sha: str) -> list[dict]:
     return [json.loads(line) for line in lines if line]
 
 
-def wait_ci(sha: str) -> None:
+def wait_ci(sha: str, required: list[str]) -> None:
     """Done when every check is completed and the count is unchanged after CI_STABLE_WAIT seconds."""
     deadline = time.monotonic() + CI_TIMEOUT
     prev = -1
@@ -109,7 +112,7 @@ def wait_ci(sha: str) -> None:
         runs = check_runs(sha)
         done = bool(runs) and all(r.get("status") == "completed" for r in runs)
         if done and len(runs) == prev:
-            reason = ci_verdict(runs)
+            reason = ci_verdict(runs, required)
             if reason:
                 raise Skip(reason)
             return
@@ -137,12 +140,12 @@ def check_tasks(branch: str) -> None:
             raise Skip(f"{tid} chưa `done` ({status}); review/QA xong thì chạy /close-task {tid}")
 
 
-def resolve_conflict(branch: str) -> str:
-    """Merge origin/main into the branch; regenerate BOARD/INBOX if only they conflict. Returns new head SHA."""
+def resolve_conflict(branch: str, base: str) -> str:
+    """Merge the base branch into the branch; regenerate BOARD/INBOX if only they conflict. Returns new head SHA."""
     sh("git", "switch", branch)
     try:
         sh("git", "pull", "--ff-only", "origin", branch)
-        if sh("git", "merge", "--no-edit", "origin/main", check=False).returncode == 0:
+        if sh("git", "merge", "--no-edit", f"origin/{base}", check=False).returncode == 0:
             sh("git", "push", "origin", branch)
             return out("git", "rev-parse", "HEAD")
         conflicted = set(out("git", "diff", "--name-only", "--diff-filter=U").splitlines())
@@ -156,11 +159,11 @@ def resolve_conflict(branch: str) -> str:
         chk = sh("python3", str(TOOLS / "build_inbox.py"), "--check", check=False)
         if chk.returncode != 0:
             last = (chk.stdout.strip().splitlines() or [""])[-1]
-            raise Skip(f"build_inbox --check báo vấn đề sau khi gộp main (commit gộp chưa push): {last}")
+            raise Skip(f"build_inbox --check báo vấn đề sau khi gộp {base} (commit gộp chưa push): {last}")
         sh("git", "push", "origin", branch)
         return out("git", "rev-parse", "HEAD")
     finally:
-        sh("git", "switch", "main", check=False)
+        sh("git", "switch", base, check=False)
 
 
 def pr_view(n: int) -> dict:
@@ -173,17 +176,17 @@ def pr_view(n: int) -> dict:
     return pr
 
 
-def merge_open(pr: dict) -> str:
+def merge_open(pr: dict, base: str, required: list[str]) -> str:
     n, branch = pr["number"], pr["headRefName"]
     if pr["isDraft"]:
         raise Skip("PR đang draft")
-    if pr["baseRefName"] != "main":
-        raise Skip(f"base là {pr['baseRefName']}, không phải main")
+    if pr["baseRefName"] != base:
+        raise Skip(f"base là {pr['baseRefName']}, không phải {base}")
     check_tasks(branch)
     sha = pr["headRefOid"]
     if pr["mergeable"] == "CONFLICTING":
-        sha = resolve_conflict(branch)
-    wait_ci(sha)
+        sha = resolve_conflict(branch, base)
+    wait_ci(sha, required)
     res = sh("gh", "pr", "merge", str(n), "--merge", "--delete-branch", "--match-head-commit", sha, check=False)
     if res.returncode != 0:
         raise Skip(f"gh pr merge lỗi (head đổi sau khi kiểm CI?): {res.stderr.strip()[:200]}")
@@ -200,11 +203,11 @@ def delete_local(branch: str) -> str:
     return "merge tay, đã xoá nhánh local"
 
 
-def targets(args: list[str]) -> list[int]:
+def targets(args: list[str], base: str) -> list[int]:
     if args:
         return sorted({int(a.lstrip("#")) for a in args})
-    open_prs = json.loads(out("gh", "pr", "list", "--state", "open", "--base", "main", "--json", "number"))
-    merged = json.loads(out("gh", "pr", "list", "--state", "merged", "--base", "main", "--limit", "30",
+    open_prs = json.loads(out("gh", "pr", "list", "--state", "open", "--base", base, "--json", "number"))
+    merged = json.loads(out("gh", "pr", "list", "--state", "merged", "--base", base, "--limit", "30",
                             "--json", "number,headRefName"))
     local = {b for b in out("git", "for-each-ref", "--format=%(refname:short)", "refs/heads").splitlines()}
     nums = {p["number"] for p in open_prs} | {p["number"] for p in merged if p["headRefName"] in local}
@@ -218,10 +221,21 @@ def main(argv: list[str]) -> int:
     if out("git", "status", "--porcelain", "--untracked-files=no"):
         print("Dừng: có thay đổi chưa commit ở repo chính (không stash, không xoá). Commit hoặc dọn rồi chạy lại.")
         return 2
-    sh("git", "switch", "main")
+    try:
+        base = merge_settings(REPO)[0]
+    except ConfigError as e:
+        print(f"Dừng: {e}")
+        return 2
+    sh("git", "switch", base)
     sh("git", "fetch", "--prune", "origin")
+    sh("git", "merge", "--ff-only", f"origin/{base}")
+    try:  # gates come from the up-to-date base branch, not from whatever branch was checked out
+        required = merge_settings(REPO)[1]
+    except ConfigError as e:
+        print(f"Dừng: {e}")
+        return 2
     rows: list[tuple[int, str, str, str]] = []
-    for n in targets(argv):
+    for n in targets(argv, base):
         try:
             pr = pr_view(n)
         except RuntimeError as e:
@@ -236,16 +250,16 @@ def main(argv: list[str]) -> int:
             continue
         print(f"#{n} {branch}: kiểm cổng…", file=sys.stderr, flush=True)
         try:
-            rows.append((n, branch, merge_open(pr), ""))
-            sh("git", "fetch", "origin", "main")  # next PR may now conflict on BOARD
+            rows.append((n, branch, merge_open(pr, base, required), ""))
+            sh("git", "fetch", "origin", base)  # next PR may now conflict on BOARD
         except Skip as e:
             rows.append((n, branch, "bỏ qua", str(e)))
         except RuntimeError as e:
-            sh("git", "switch", "main", check=False)
+            sh("git", "switch", base, check=False)
             rows.append((n, branch, "bỏ qua", f"lỗi lệnh: {e}"))
 
-    sh("git", "switch", "main")
-    sh("git", "pull", "--ff-only", "origin", "main")
+    sh("git", "switch", base)
+    sh("git", "pull", "--ff-only", "origin", base)
     sh("git", "fetch", "--prune", "origin")
     rows = [(n, b, delete_local(b) if r == "merge tay" else r, why) for n, b, r, why in rows]
     chk = sh("python3", str(TOOLS / "build_inbox.py"), "--check", check=False)
@@ -254,7 +268,7 @@ def main(argv: list[str]) -> int:
 
     report = [f"| PR | nhánh | kết quả | lý do |", "|---|---|---|---|"]
     report += [f"| #{n} | {b} | {r} | {why} |" for n, b, r, why in rows] or ["| - | - | không có PR nào cần xử lý | |"]
-    report.append(f"main: {head}")
+    report.append(f"{base}: {head}")
     report.append(f"build_inbox --check: {chk_line}" + ("" if chk.returncode == 0 else " (CÓ VẤN ĐỀ, chưa sửa)"))
     any_merged = any(r == "merged" or r.startswith("merge tay") for _, _, r, _ in rows)
     if any_merged:
@@ -264,7 +278,7 @@ def main(argv: list[str]) -> int:
     if rows:
         handoff = [f"# Handoff ({date.today().isoformat()}, sau merge_pr.py)", ""]
         handoff += [f"- #{n} {b}: {r}" + (f" ({why})" if why else "") for n, b, r, why in rows]
-        handoff += [f"- Trạng thái main: {head}; build_inbox --check: {chk_line}",
+        handoff += [f"- Trạng thái {base}: {head}; build_inbox --check: {chk_line}",
                     "- Bước tiếp: chọn task `ready` kế tiếp theo backlog (PM)."]
         (REPO / MGMT / "HANDOFF.md").write_text("\n".join(handoff[:15]) + "\n", encoding="utf-8")
     return 0

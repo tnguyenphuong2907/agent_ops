@@ -29,6 +29,12 @@ Cập nhật lên bản mới nhất:
 
 Gỡ cài đặt: `/plugin uninstall agent-ops@agent-ops-local`.
 
+## Khởi tạo dự án mới
+
+Trong repo đã `git init`, gõ `/agent-ops:init` (hoặc chạy `tools/init_project.py [--management DIR] [--base BRANCH]`). Lệnh chỉ tạo file còn thiếu: `.agent-ops.toml`, `.claude/project-profile.md`, và trong thư mục quản lý: `README.md` (luật quy trình), `decision-policy.md`, `decisions.md`, `roadmap.md`, `lessons/`, `tasks/`, `decision-requests/`, BOARD và DECISIONS-INBOX. Bản chép thuộc về dự án: cập nhật plugin không đổi chúng.
+
+Sau đó điền hồ sơ dự án và tên check CI vào `[merge] required_checks`. `mp` cần `gh`, remote GitHub và PR có ít nhất một check CI.
+
 ## Cấu hình dự án
 
 Tạo `.agent-ops.toml` ở gốc dự án:
@@ -39,8 +45,14 @@ plugin_path = "../agent-ops/plugins/agent-ops"   # dùng cho shim tool (đườn
 [paths]
 management = "management"                         # thư mục quản lý (mặc định)
 
+[merge]
+base = "main"                                     # nhánh đích của ct / mp
+required_checks = []                              # tên check CI bắt buộc, vd. ["scan"]; mặc định: không bắt buộc check nào theo tên
+
 [inbox]
 no_review_conclusion_exempt_ids = []              # DR được miễn kết luận phản biện
+analyst_topics = []                               # topic bắt buộc có ý kiến product-analyst
+# [inbox.topics]                                  # nếu khai: thay toàn bộ danh sách mặc định (khoá = "tên nhóm")
 
 [check_docs]
 scan_dirs = ["management", "docs"]                # thư mục .md cần kiểm link
@@ -62,4 +74,4 @@ python -m pytest plugins/agent-ops/tools/tests plugins/agent-ops/hooks/scripts
 
 ## Nội dung
 
-`tools/` (Python stdlib), `hooks/` (hooks.json + scripts), `templates/`, `commands/` (gọi dạng `/agent-ops:<lệnh>`). Agent và skill chưa chuyển vào bản 0.1.0.
+`tools/` (Python stdlib), `hooks/` (hooks.json + scripts), `templates/`, `commands/` (gọi dạng `/agent-ops:<lệnh>`). Agent (`agents/`) và skill chung (`skills/`) cũng nằm trong plugin.

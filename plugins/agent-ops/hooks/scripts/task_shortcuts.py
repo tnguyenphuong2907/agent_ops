@@ -1,4 +1,4 @@
-"""UserPromptSubmit hook: zero-token shortcuts for mechanical PM chores (D-219).
+"""UserPromptSubmit hook: zero-token shortcuts for mechanical PM chores.
 
   mp [PR ...]    -> tools/merge_pr.py   (merge + clean up; typing it is the PO's OK to merge)
   ct [TASK-ID]   -> tools/close_task.py (close a task after review Approved + QA Passed)

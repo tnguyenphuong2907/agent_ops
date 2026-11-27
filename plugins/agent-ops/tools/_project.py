@@ -6,6 +6,9 @@ Config: `.agent-ops.toml` at the project root, e.g.
     plugin_path = "../agent-ops/plugins/agent-ops"   # used by the shims in <management>/tools
     [paths]
     management = "management"                         # default
+    [merge]
+    base = "main"                                     # default
+    required_checks = []                              # check-run names a PR must have (default: none)
 """
 from __future__ import annotations
 
@@ -16,6 +19,7 @@ from pathlib import Path
 
 CONFIG_NAME = ".agent-ops.toml"
 DEFAULT_MANAGEMENT = "management"
+DEFAULT_BASE_BRANCH = "main"
 
 
 def project_root() -> Path:
@@ -39,6 +43,38 @@ def load_config(root: Path | None = None) -> dict:
         return tomllib.loads(path.read_text(encoding="utf-8"))
     except (OSError, tomllib.TOMLDecodeError):
         return {}
+
+
+class ConfigError(Exception):
+    """`.agent-ops.toml` cannot be trusted for a gate."""
+
+
+def merge_settings(root: Path | None = None) -> tuple[str, list[str]]:
+    """(base branch, required check names) from `[merge]`. Strict: these drive merge gates.
+
+    Unlike `load_config`, a file that exists but cannot be read or parsed raises, so a typo never
+    silently drops a required check. A missing file means the defaults.
+    """
+    path = (root or project_root()) / CONFIG_NAME
+    try:
+        config = tomllib.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        config = {}
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as e:
+        raise ConfigError(f"không đọc được {CONFIG_NAME}: {e}") from e
+    section = config.get("merge", {})
+    if not isinstance(section, dict):
+        raise ConfigError(f"{CONFIG_NAME}: [merge] phải là bảng")
+    unknown = sorted(set(section) - {"base", "required_checks"})
+    if unknown:
+        raise ConfigError(f"{CONFIG_NAME}: [merge] có khoá lạ: {', '.join(unknown)}")
+    base = section.get("base", DEFAULT_BASE_BRANCH)
+    checks = section.get("required_checks", [])
+    if not isinstance(base, str) or not base.strip():
+        raise ConfigError(f"{CONFIG_NAME}: merge.base phải là chuỗi không rỗng")
+    if not isinstance(checks, list) or not all(isinstance(c, str) and c for c in checks):
+        raise ConfigError(f"{CONFIG_NAME}: merge.required_checks phải là danh sách tên check")
+    return base.strip(), checks
 
 
 def mgmt_rel(root: Path | None = None) -> str:
