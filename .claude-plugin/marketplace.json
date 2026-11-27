@@ -1,0 +1,11 @@
+{
+  "name": "agent-ops-local",
+  "owner": { "name": "PO" },
+  "plugins": [
+    {
+      "name": "agent-ops",
+      "source": "./plugins/agent-ops",
+      "description": "Agent-team project management: tasks/epics board, decision requests (DR), lessons learned, daily cadence, close-task and merge-pr shortcuts, context guard."
+    }
+  ]
+}
