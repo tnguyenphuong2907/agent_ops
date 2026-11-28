@@ -45,7 +45,7 @@ def main(argv: list[str]) -> int:
     tdir = task_md.parent
     text = task_md.read_text(encoding="utf-8")
     errors = verdict_errors(text) + check_task.gate_errors(tdir, tid, "close")
-    move: list[tuple[Path, str, str, str]] = []
+    move: list[tuple[Path | None, str, str, str]] = []
     for sub in sorted(tdir.glob(f"{tid}-S*.md")):
         body = sub.read_text(encoding="utf-8")
         status = ct.frontmatter(body).get("status", "?")
@@ -54,6 +54,14 @@ def main(argv: list[str]) -> int:
             move.append((sub, sid, status, body))
         elif status != "done":
             errors.append(f"{sid} đang `{status}`, chưa qua review")
+    for sid, cell in ct.subtask_rows(text, tid):
+        if list(tdir.glob(f"{sid}-*.md")):
+            continue
+        status = cell.strip("*` ")
+        if status in REVIEWED:
+            move.append((None, sid, status, ""))
+        elif status != "done":
+            errors.append(f"{sid} (chỉ có dòng bảng) đang `{status}`, chưa qua review")
     if errors:
         print(f"Chưa chuẩn bị đóng {tid} (chưa sửa gì):")
         print("\n".join(f"- {e}" for e in errors))
@@ -73,7 +81,8 @@ def main(argv: list[str]) -> int:
         if status.strip("*` ") != "done" and list(tdir.glob(f"{sid}-*.md")):
             text = task_step.set_row_status(text, sid, "done")
     for sub, _, _, body in move:
-        sub.write_text(task_step.put_field(body, "status", "done"), encoding="utf-8")
+        if sub:
+            sub.write_text(task_step.put_field(body, "status", "done"), encoding="utf-8")
     task_md.write_text(text, encoding="utf-8")
     if history is not None:
         log_md.write_text(history, encoding="utf-8")

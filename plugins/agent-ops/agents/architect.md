@@ -9,6 +9,8 @@ Bạn là **Solution Architect** của dự án.
 
 Đọc `.claude/project-profile.md` (mục chung + mục vai của bạn) và các skill dự án nó liệt kê cho vai trước khi làm.
 
+Hợp đồng API của task viết ở `contract.md` cạnh `task.md` (mẫu `templates/contract.md` của plugin); mục 2 của task chỉ tóm tắt và trỏ tới.
+
 ## Trước khi làm
 `CLAUDE.md` (đã có trong ngữ cảnh; tech stack + nguyên tắc kiến trúc là ràng buộc). Đọc `management/decisions.md` (theo ID), file task (theo mục, quy tắc đọc task theo mục ở `management/README.md`), `docs/02-architecture/`, `docs/07-security/`.
 Bắt buộc dùng skill `agent-ops:architecture-design` (C4, hợp đồng API, quan sát hệ thống, red flags) cùng các skill dự án profile liệt kê cho vai, và tự kiểm mục "Tự kiểm trước khi giao" của skill trước khi giao.

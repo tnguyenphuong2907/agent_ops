@@ -29,7 +29,11 @@ TASK = re.compile(r"\bE\d\d-T\d\d")
 SUBTASK = re.compile(r"\bE\d\d-T\d\d-S\d\d\b")
 PLAN_RUN = re.compile(r"(?im)^\W*Chế độ:\W*lập kế hoạch")
 DR_ROLES = {"architect", "decision-reviewer"}
-DR_WORK = re.compile(r"(?i)\b(soạn|phản biện|draft|review)\b[^\n]{0,60}?(\bDR-\d{3}\b|\bphiếu\b|\bDR\b)")
+_VERB = r"(?:soạn|viết|phản biện|draft|review)"
+_DR = r"(?:phiếu\b(?:\s+DR(?:-\d{3})?)?|DR(?:-\d{3})?\b)"
+# The verb's object must be the request itself, not a design that merely cites one.
+DR_WORK = re.compile(rf"(?i)\b{_VERB}\s+(?:(?:đề xuất|mục\s+[\d ,–-]+(?:và\s+\d+)?)\s*(?:(?:cho|của)\s+)?)?{_DR}"
+                     rf"|\bDR-\d{{3}}\s*[:,–-]?\s*{_VERB}\b")
 TYPE1_RULE = re.compile(r"(?i)\b(quy tắc|nhóm|rule)\W{0,4}1\.(1[0-2]|[1-9])\b")
 PLACEHOLDER = re.compile(r"<điền[^>\n]*>")
 OPUS_REASON = re.compile(r"(?im)^\W*Lý do opus:[ \t*]*\S")

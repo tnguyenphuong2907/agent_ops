@@ -4,11 +4,13 @@ Usage: python3 "${CLAUDE_PLUGIN_ROOT}/tools/dr_apply.py" DR-xxx [--choice X] [--
 Requires `status: provisional`, `type: 2` and an empty `decided_as`. Appends the next D row (⏳ tạm) to
 decisions.md, sets `decided_as`, fills the "Quyết định" block, adds a history row (with the token
 count), copies "Lưu ý khi làm" into section 7 of every unfinished task in `affects`, then runs
-build_inbox. Choice and summary default to the "architect đề xuất" line. Standard library only.
+build_inbox. Choice and summary default to the "architect đề xuất" line; a `--choice` other than the proposed one needs
+`--summary`. Relative links of the copied notes are rewritten for the file they land in. Standard library only.
 """
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 from datetime import date
@@ -29,6 +31,18 @@ def notes(dr_text: str) -> list[str]:
                          ct.COMMENT.sub("", dr_text) + "\n"):
         out += [l.rstrip() for l in m.group(1).splitlines() if l.strip()]
     return out
+
+
+def relink(line: str, source: Path, target: Path) -> str:
+    """Rewrite relative Markdown links of `line` from `source`'s folder to `target`'s folder."""
+    def repl(m: re.Match) -> str:
+        link = m.group(1)
+        if re.match(r"[a-z][a-z0-9+.-]*:|/", link, re.I):
+            return m.group(0)
+        path, sep, anchor = link.partition("#")
+        dest = (source.parent / path) if path else source
+        return f"]({os.path.relpath(os.path.normpath(dest), target.parent).replace(os.sep, '/')}{sep}{anchor})"
+    return re.sub(r"\]\(([^)\s]+)\)", repl, line)
 
 
 def affected_tasks(affects: str) -> list[str]:
@@ -76,7 +90,10 @@ def main(argv: list[str]) -> int:
     fm = ct.frontmatter(text)
     proposal = PROPOSAL.search(text)
     choice = args.choice or (proposal and proposal.group(1).replace("*", "").strip())
-    summary = args.summary or (proposal and proposal.group(2).strip())
+    proposed = proposal.group(1).replace("*", "").strip() if proposal else None
+    summary = args.summary
+    if not summary and proposal and choice == proposed:
+        summary = proposal.group(2).strip()
     errors = []
     if fm.get("status") != "provisional":
         errors.append(f"status là `{fm.get('status')}`, cần `provisional`")
@@ -118,7 +135,7 @@ def main(argv: list[str]) -> int:
             target = hits[0].parent / "log.md"
             target = target if target.is_file() else hits[0]
             line = f"- {today} dr-apply: {args.dr_id} = {choice} ({did}, ⏳ tạm). Lưu ý khi làm:\n" + "\n".join(
-                "  " + n for n in found)
+                "  " + relink(n, dr_md, target) for n in found)
             try:
                 writes[target] = add_note(target.read_text(encoding="utf-8"), line)
             except ValueError:

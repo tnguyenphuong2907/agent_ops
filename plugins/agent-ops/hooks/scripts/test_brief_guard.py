@@ -85,13 +85,16 @@ class DecisionRequestModel(unittest.TestCase):
         return guard.problems(call(role=role, model=model, prompt=prompt), Path("."))
 
     def test_opus_dr_without_rule_denied(self):
-        for prompt in ("Soạn DR-081 mục 2-6", "Phản biện phiếu DR-081 vòng 1"):
+        for prompt in ("Soạn DR-081 mục 2-6", "Phản biện phiếu DR-081 vòng 1", "Viết phiếu DR-081",
+                       "DR-081: soạn mục 2-6", "Soạn mục 2–6 của DR-081", "Soạn đề xuất cho phiếu DR-081"):
             for role in ("architect", "decision-reviewer"):
                 self.assertTrue(any("quy tắc 1.x" in p for p in self.check(prompt, role)), prompt)
 
     def test_allowed(self):
         for kw in ({"prompt": "Soạn DR-081, quy tắc 1.5 (bảo mật)"}, {"prompt": "Soạn DR-081", "model": "sonnet"},
                    {"prompt": "Thiết kế kiến trúc theo DR-079"},
+                   {"prompt": "Soạn hợp đồng API cho E09-T01 theo DR-079\n" + LINES},
+                   {"prompt": "Review thiết kế lát Viết; DR-079 đã chốt"},
                    {"prompt": "Soạn DR-081", "role": "product-analyst"}):
             self.assertEqual(self.check(**kw), [], kw)
 

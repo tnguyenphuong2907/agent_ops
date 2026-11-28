@@ -56,6 +56,26 @@ class Handoff(unittest.TestCase):
         self.assertIn("bị lược", text)
 
 
+class HandoffReview(unittest.TestCase):
+    def test_close_lines_never_cut(self):
+        old = "".join(f"- việc {i}\n" for i in range(12))
+        fresh = ["- Đã đóng E09-T01", "- Bước tiếp: làm X"]
+        text = handoff.compose(old, "close_task.py", fresh)
+        self.assertTrue(all(line in text for line in fresh), text)
+
+    def test_waiting_lines_drop_after_merge(self):
+        old = "- Đã đóng E09-T01; chờ PO: mp 300.\n- Bước tiếp: chờ merge #300\n- Đã đóng E09-T02; chờ PO: mp 301.\n"
+        text = handoff.compose(old, "merge_pr.py", ["- #300 a: merged", "- #301 b: bỏ qua (x)"], {300, 301})
+        self.assertNotIn("mp 300", text)
+        self.assertNotIn("merge #300", text)
+        self.assertIn("mp 301", text)
+
+    def test_next_step_heading_kept(self):
+        text = handoff.compose("## Bước tiếp\nlàm X\n", "merge_pr.py", ["- #1 a: merged"], {1})
+        self.assertIn("- Bước tiếp\nlàm X", text)
+        self.assertNotIn(handoff.DEFAULT_NEXT, text)
+
+
 class Pack(unittest.TestCase):
     def test_parts_are_limited_in_bytes(self):
         parts = pack.split_parts(["đường dẫn tiếng Việt ữ ề\n" * 5000, "ỹ" * 40_000])
@@ -234,6 +254,27 @@ decided_as:
     def test_proposal_with_composite_choice(self):
         m = dr.PROPOSAL.search("**architect đề xuất:** A + T1 — giữ link cũ.")
         self.assertEqual(m.groups(), ("A + T1", "giữ link cũ."))
+
+    def test_dr_apply_other_choice_needs_summary(self):
+        path = self.make_dr()
+        before = path.read_text(encoding="utf-8")
+        self.assertEqual(self.run_main(dr, ["DR-001", "--choice", "A"])[0], 1)
+        self.assertEqual(path.read_text(encoding="utf-8"), before)
+
+    def test_relink(self):
+        src = self.drs / "DR-001-a.md"
+        got = dr.relink("- xem [a](../../docs/a.md#x), [b](#muc), [c](https://x.y)", src, self.tdir / "log.md")
+        self.assertIn("(../../../../docs/a.md#x)", got)
+        self.assertIn("(../../../decision-requests/DR-001-a.md#muc)", got)
+        self.assertIn("(https://x.y)", got)
+
+    def test_prepare_close_row_only_subtask(self):
+        row = "| E09-T01-S01 | A | dev | 1 | in_review |\n"
+        self.task.write_text(task_text().replace(row, row + "| E09-T01-S02 | B | dev | 0 | ready |\n"), encoding="utf-8")
+        self.assertEqual(self.run_main(prep, ["E09-T01"])[0], 1)
+        self.task.write_text(task_text().replace(row, row + "| E09-T01-S02 | B | dev | 0 | in_review |\n"), encoding="utf-8")
+        self.assertEqual(self.run_main(prep, ["E09-T01"])[0], 0)
+        self.assertIn("| E09-T01-S02 | B | dev | 0 | done |", self.task.read_text(encoding="utf-8"))
 
     def test_dr_apply_refuses(self):
         for status, type_ in (("open", "2"), ("provisional", "1")):

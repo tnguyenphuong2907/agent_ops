@@ -8,29 +8,85 @@ from __future__ import annotations
 
 import json
 import os
-import shlex
+import re
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools"))
 
 CREATE = {"switch": {"-c", "-C", "--create", "--force-create"}, "checkout": {"-b", "-B"}, "worktree": {"-b", "-B"}}
-SEPARATORS = {";", "&&", "||", "|", "&", "(", ")", "\n"}
 GIT_VALUE_OPTS = {"-C", "-c", "--git-dir", "--work-tree"}
 
 
+HEREDOC = re.compile(r"<<-?[ \t]*(['\"]?)(\w+)\1")
+
+
 def segments(command: str) -> list[list[str]]:
-    """Words of each simple command; quoted text stays one word."""
-    lex = shlex.shlex(command.replace("\\\n", " ").replace("\n", " ; "), posix=True, punctuation_chars=";&|()")
-    lex.whitespace_split = True
-    out, cur = [], []
-    for word in lex:
-        if word and set(word) <= set(";&|()"):
-            out.append(cur)
-            cur = []
+    """Words of each simple command; quoted text stays one word, comments and heredoc bodies are skipped."""
+    out: list[list[str]] = [[]]
+    word, quote, started, pending = "", "", False, []
+    text = command.replace("\\\n", " ")
+    i = 0
+
+    def end_word() -> None:
+        nonlocal word, started
+        if started:
+            out[-1].append(word)
+        word, started = "", False
+
+    while i < len(text):
+        ch = text[i]
+        if quote:
+            if ch == quote:
+                quote = ""
+            elif ch == "\\" and quote == '"' and i + 1 < len(text):
+                i += 1
+                word += text[i]
+            else:
+                word += ch
+        elif ch in "'\"":
+            quote, started = ch, True
+        elif ch == "\\" and i + 1 < len(text):
+            i += 1
+            word, started = word + text[i], True
+        elif ch == "#" and not started:
+            end = text.find("\n", i)
+            i = len(text) if end < 0 else end
+            continue
+        elif text.startswith("<<", i) and not text.startswith("<<<", i) and (m := HEREDOC.match(text, i)):
+            end_word()
+            pending.append(m.group(2))
+            i = m.end()
+            continue
+        elif ch == "\n":
+            end_word()
+            out.append([])
+            while pending:
+                m = re.compile(rf"(?m)^\t*{pending.pop(0)}$").search(text, i + 1)
+                i = m.end() if m else len(text)
+        elif ch in ";&|()":
+            end_word()
+            out.append([])
+        elif ch.isspace():
+            end_word()
         else:
-            cur.append(word)
-    return out + [cur]
+            word, started = word + ch, True
+        i += 1
+    end_word()
+    return out
+
+
+def new_branch(rest: list[str], flags: set[str]) -> str | None:
+    """Name given to a create option, in the forms `-c x`, `-cx` and `--create=x`."""
+    for i, a in enumerate(rest):
+        if a in flags:
+            return rest[i + 1] if i + 1 < len(rest) else None
+        for flag in flags:
+            if flag.startswith("--") and a.startswith(flag + "="):
+                return a[len(flag) + 1:]
+            if not flag.startswith("--") and a.startswith(flag) and len(a) > len(flag):
+                return a[len(flag):]
+    return None
 
 
 def tracks_base(words: list[str], base: str) -> bool:
@@ -49,10 +105,8 @@ def tracks_base(words: list[str], base: str) -> bool:
         return len(names) == 2 and names[1] == f"origin/{base}" and names[0] != base
     if sub not in CREATE:
         return False
-    for i, a in enumerate(rest[:-1]):
-        if a in CREATE[sub]:
-            return rest[i + 1] != base
-    return False
+    name = new_branch(rest, CREATE[sub])
+    return name is not None and name != base
 
 
 def main() -> int:

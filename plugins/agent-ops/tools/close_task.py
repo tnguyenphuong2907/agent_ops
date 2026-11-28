@@ -278,8 +278,9 @@ def main(argv: list[str]) -> int:
 
     co = [l for l in out("git", "log", "-1", "--format=%B").splitlines() if l.startswith("Co-Authored-By:")]
     msg = f"chore(tasks): QA passed, close {tid} [{tid}]" + ("\n\n" + "\n".join(co) if co else "")
-    sh("git", "add", "-u", "--", rel(tdir))  # tracked edits left in the task folder (prepare_close.py)
-    sh("git", "add", *[rel(p) for p in changed], f"{MGMT}/BOARD.md")
+    # Subtask files may already be `done` but uncommitted (prepare_close.py); other files stay untouched.
+    docs = {*changed, *tdir.glob(f"{tid}-S*.md"), *([log_md] if log_md.exists() else [])}
+    sh("git", "add", "--", *sorted(rel(p) for p in docs), f"{MGMT}/BOARD.md")
     sh("git", "commit", "-m", msg)
     sha = out("git", "rev-parse", "--short", "HEAD")
     push = sh("git", "push", "origin", "HEAD", check=False)
@@ -297,16 +298,23 @@ def main(argv: list[str]) -> int:
         print(f"PR {pr}: {note}" if pr else note)
     if epic_all_done:
         print(f"Mọi task của epic {tid[:3]} đã done: cân nhắc đóng epic (không tự đổi).")
-    nxt = f"mp {pr}" if pr else "mở PR rồi gõ `mp <số PR>`"
+    failed = push.returncode != 0 or note.startswith("KHÔNG")
+    if push.returncode != 0:
+        nxt = f"push lại (`git push origin HEAD`, đang thiếu commit {sha}) rồi mới merge"
+    elif note.startswith("KHÔNG bỏ được nháp"):
+        nxt = f"bỏ nháp PR #{pr} rồi gõ `mp {pr}`"
+    else:
+        nxt = f"mp {pr}" if pr else "mở PR rồi gõ `mp <số PR>`"
     if args.handoff or args.next_step:
-        fresh = [f"- Đã đóng {tid} (commit {sha}{', PR #' + pr if pr else ''}); chờ PO: {nxt}."]
+        fresh = [f"- Đã đóng {tid} (commit {sha}{', PR #' + pr if pr else ''}); " 
+                 + (f"CÒN LỖI: {nxt}." if failed else f"chờ PO: {nxt}.")]
         if args.next_step:
             fresh.append(f"- Bước tiếp: {args.next_step}")
         handoff.write(REPO / MGMT / "HANDOFF.md", "close_task.py", fresh)
         print(f"Đã ghi {MGMT}/HANDOFF.md.")
-    print(f"Bước tiếp: {nxt}" if pr else "Bước tiếp: " + nxt + ".")
+    print(f"Bước tiếp: {nxt}")
     print("Task xong: nên chạy `/clear` trước khi sang việc mới.")
-    return 0
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

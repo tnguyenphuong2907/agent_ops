@@ -72,7 +72,7 @@ Theo agent `decision-reviewer`: phép thử "PO có chọn khác đi không?", t
 ## 3b. Mục 10 "Hồ sơ quyết định cho PO"
 - architect viết (mục 2), decision-reviewer kiểm và điền phần của mình (mục 3). **pm không tham gia trước `/decide`.** Lý do: pm chỉ tóm lại nội dung có sẵn mà tốn một agent 15–30K; độc lập của hồ sơ do reviewer kiểm.
 - Mục 10 phải đủ để PO quyết mà không đọc mục khác: câu hỏi, vì sao cần PO, phương án (được/mất/công sức), đề xuất của architect, kết luận + lời nhắn của reviewer, bất đồng còn lại, những gì PO đồng ý kèm theo, điều khó đảo ngược, cách trả lời.
-- Loại 2 / ⬇️: **phiên chính** chạy `python3 "${CLAUDE_PLUGIN_ROOT}/tools/dr_apply.py" DR-xxx --tokens <N>K`: ghi D-xxx nhãn **⏳ tạm (agent)**, điền `decided_as`, chép *Lưu ý khi làm* sang task, chạy `build_inbox.py`. Phương án và tóm tắt lấy từ dòng "architect đề xuất" (đổi bằng `--choice`, `--summary`). Phiếu ⬇️ (`type: 1`) thì làm tay, ghi thêm "hạ loại".
+- Loại 2 / ⬇️: **phiên chính** chạy `python3 "${CLAUDE_PLUGIN_ROOT}/tools/dr_apply.py" DR-xxx --tokens <N>K`: ghi D-xxx nhãn **⏳ tạm (agent)**, điền `decided_as`, chép *Lưu ý khi làm* sang task, chạy `build_inbox.py`. Phương án và tóm tắt lấy từ dòng "architect đề xuất"; đổi `--choice` thì kèm `--summary`. Phiếu ngắn không có dòng đó nên truyền cả `--choice` và `--summary`. Phiếu ⬇️ (`type: 1`) thì làm tay, ghi thêm "hạ loại".
 
 ## 4. Sau mỗi thay đổi phiếu
 Agent vừa sửa phiếu chạy `python3 "${CLAUDE_PLUGIN_ROOT}/tools/build_inbox.py"` để cập nhật inbox. Báo cáo ngày dẫn tới inbox thay vì chép lại nội dung phiếu.
