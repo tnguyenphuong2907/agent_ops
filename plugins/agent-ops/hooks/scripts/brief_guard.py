@@ -1,9 +1,13 @@
 """PreToolUse hook on agent spawns: stop a task brief that skips the project's rules.
 
+Any opus run of architect / decision-reviewer that drafts or reviews a decision request names the
+type 1 rule (`quy tắc 1.x`); without one the request is not yet type 1 and uses sonnet.
+
 For `agent-ops:*` agents (except pm and haiku runs) whose prompt names a task:
 - the brief carries the four lines of task-management § Giao việc (write "không có" when empty);
 - a dev run on opus states `Lý do opus:`; execution defaults to sonnet;
 - a planning run (`Chế độ: lập kế hoạch`) uses opus;
+- no `<điền …>` placeholder of brief.py is left;
 - a subtask marked `plan: opus` is not coded before its "## Kế hoạch" section is written.
 Denies with the reason so the main session fixes and resends. Any internal error lets the call pass.
 Standard library only.
@@ -24,6 +28,16 @@ LABELS = ("Quyết định đang treo", "Reviewer sẽ kiểm", "Đầu ra bắt
 TASK = re.compile(r"\bE\d\d-T\d\d")
 SUBTASK = re.compile(r"\bE\d\d-T\d\d-S\d\d\b")
 PLAN_RUN = re.compile(r"(?im)^\W*Chế độ:\W*lập kế hoạch")
+DR_ROLES = {"architect", "decision-reviewer"}
+_VERB = r"(?:soạn|viết|phản biện|draft|review)"
+_DR = r"(?:phiếu\b(?:[ \t]+[`*\"]*DR(?:-\d{3})?)?|DR(?:-\d{3})?\b)"
+# Words that may stand between the verb and its object; any other word means the object is not the request.
+_FILL = r"(?:lại|vòng[ \t]*\d+|đề xuất|mục[ \t]+\d[\d ,–-]*(?:và[ \t]*\d+)?|cho|của)"
+# The verb's object must be the request itself, not a design that merely cites one. One line only.
+DR_WORK = re.compile(rf"(?im)\b{_VERB}(?:[ \t]+{_FILL})*[ \t]*:?[ \t]*[`*\"]*{_DR}"
+                     rf"|^\W*(?:phiếu[ \t]+)?DR-\d{{3}}[`*]*[ \t]*:[ \t]*{_VERB}\b")
+TYPE1_RULE = re.compile(r"(?i)\b(quy tắc|nhóm|rule)\W{0,4}1\.(1[0-2]|[1-9])\b")
+PLACEHOLDER = re.compile(r"<điền[^>\n]*>")
 OPUS_REASON = re.compile(r"(?im)^\W*Lý do opus:[ \t*]*\S")
 
 
@@ -32,11 +46,17 @@ def problems(tool_input: dict, root: Path) -> list[str]:
     model = str(tool_input.get("model") or "")
     prompt = str(tool_input.get("prompt") or "")
     role = agent.removeprefix(PREFIX)
-    if not agent.startswith(PREFIX) or role == "pm" or model == "haiku" or not TASK.search(prompt):
+    if not agent.startswith(PREFIX):
         return []
-    if PLAN_RUN.search(prompt):
-        return [] if model == "opus" else ["lượt lập kế hoạch phải truyền model `opus`"]
     found = []
+    if role in DR_ROLES and model == "opus" and DR_WORK.search(prompt) and not TYPE1_RULE.search(prompt):
+        found.append("phiếu DR chạy opus phải ghi `quy tắc 1.x` đang áp dụng; chưa chỉ ra được thì dùng sonnet")
+    if role == "pm" or model == "haiku" or not TASK.search(prompt):
+        return found
+    if PLACEHOLDER.search(prompt):
+        found.append("brief còn chỗ `<điền …>` chưa điền")
+    if PLAN_RUN.search(prompt):
+        return found + ([] if model == "opus" else ["lượt lập kế hoạch phải truyền model `opus`"])
     missing = [l for l in LABELS if not re.search(rf"(?im)^\W*{l}[^:\n]*:", prompt)]
     if missing:
         found.append("brief thiếu dòng: " + "; ".join(f"`{m}:`" for m in missing) + " (không có gì thì ghi `không có`)")

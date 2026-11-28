@@ -34,7 +34,7 @@ links: []                # D-xxx liên quan, tài liệu, ADR, PR, commit
 -
 
 ## 2. Thiết kế kỹ thuật  ·  _chủ sở hữu: architect / db-designer / ui-designer_
-- API: `METHOD /path` — request/response tóm tắt hoặc link
+- API: `METHOD /path` — một dòng mỗi endpoint; hợp đồng đầy đủ ở [`contract.md`](contract.md) (mẫu `templates/contract.md`; không có API thì ghi `Không`)
 - DB: bảng/cột thay đổi, migration
 - UI: màn hình, link prototype/Figma
 - Ghi chú: hiệu năng, bảo mật, edge case

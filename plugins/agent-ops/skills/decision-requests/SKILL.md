@@ -32,6 +32,7 @@ Phân vân giữa phiếu ngắn và đầy đủ → phiếu đầy đủ.
 
 ## 1. Người gặp câu hỏi (mọi agent)
 1. Kiểm `management/decisions.md` và các phiếu đang mở — đã có câu trả lời hoặc phiếu trùng chưa? Có thì dùng/thêm vào `affects` của phiếu đó. **Phiếu đã `decided`: đọc `decided_as` ở frontmatter và dòng D-xxx đó trong `decisions.md` là đủ**; chỉ mở thân phiếu khi cần đúng một mục (Grep tiêu đề rồi đọc mục đó).
+   - **Chữ hiển thị trên giao diện** trong hành vi đã duyệt: product-analyst quyết và ghi vào đặc tả, không mở phiếu (trừ khi chạm một quy tắc loại 1).
 2. Nếu là **việc PO cần làm** (không phải quyết định) → báo PM ghi vào mục *Việc bạn cần làm* của inbox, không tạo phiếu.
 3. Tạo phiếu mới: số tiếp theo theo các file trong thư mục, copy template, điền frontmatter (`asked_by`, `blocks`, `affects`, `created`, `deadline`), viết **mục 1** (gặp ở đâu — task, file, dòng; vì sao không tự quyết được). `status: draft`.
 4. Trong mục 6 của task chỉ ghi một dòng: `- [DR-012](../../../decision-requests/DR-012-….md) — <câu hỏi>`. Nếu không làm tiếp được → task `blocked`, chuyển việc khác.
@@ -71,7 +72,7 @@ Theo agent `decision-reviewer`: phép thử "PO có chọn khác đi không?", t
 ## 3b. Mục 10 "Hồ sơ quyết định cho PO"
 - architect viết (mục 2), decision-reviewer kiểm và điền phần của mình (mục 3). **pm không tham gia trước `/decide`.** Lý do: pm chỉ tóm lại nội dung có sẵn mà tốn một agent 15–30K; độc lập của hồ sơ do reviewer kiểm.
 - Mục 10 phải đủ để PO quyết mà không đọc mục khác: câu hỏi, vì sao cần PO, phương án (được/mất/công sức), đề xuất của architect, kết luận + lời nhắn của reviewer, bất đồng còn lại, những gì PO đồng ý kèm theo, điều khó đảo ngược, cách trả lời.
-- Loại 2 / ⬇️: **phiên chính** ghi D-xxx nhãn **⏳ tạm (agent)** (⬇️ thì ghi thêm "hạ loại"), điền `decided_as`, chép *Lưu ý khi làm* sang task, chạy `build_inbox.py`.
+- Loại 2 / ⬇️: **phiên chính** chạy `python3 "${CLAUDE_PLUGIN_ROOT}/tools/dr_apply.py" DR-xxx --tokens <N>K`: ghi D-xxx nhãn **⏳ tạm (agent)**, điền `decided_as`, chép *Lưu ý khi làm* sang task, chạy `build_inbox.py`. Phương án và tóm tắt lấy từ dòng "architect đề xuất"; đổi `--choice` thì kèm `--summary`. Phiếu ngắn không có dòng đó nên truyền cả `--choice` và `--summary`. Phiếu ⬇️ (`type: 1`) thì làm tay, ghi thêm "hạ loại".
 
 ## 4. Sau mỗi thay đổi phiếu
 Agent vừa sửa phiếu chạy `python3 "${CLAUDE_PLUGIN_ROOT}/tools/build_inbox.py"` để cập nhật inbox. Báo cáo ngày dẫn tới inbox thay vì chép lại nội dung phiếu.

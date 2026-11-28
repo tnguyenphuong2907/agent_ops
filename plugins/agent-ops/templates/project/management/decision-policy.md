@@ -31,6 +31,7 @@ Mọi thứ không thuộc loại 1, ví dụ:
 - Thư viện nhỏ nằm trong stack đã chọn, không thêm dịch vụ (ví dụ chọn thư viện sinh QR).
 - Chi tiết test, môi trường chạy thử, cách đo trong spike.
 - Chi tiết giao diện nằm trong design system đã duyệt.
+- Chữ hiển thị trên giao diện trong hành vi đã duyệt: **product-analyst quyết** và ghi vào đặc tả, **không mở phiếu DR** (chỉ mở khi chạm một quy tắc loại 1).
 
 **Loại 2 có phiếu DR** (đề xuất + phản biện), được áp dụng ngay với trạng thái `provisional`, ghi vào `decisions.md` với nhãn ⏳ *tạm*, và PO có thể bác bất cứ lúc nào bằng `/decide`. Phiếu đầy đủ hay phiếu ngắn: xem mục 1b.
 

@@ -1,7 +1,7 @@
 """UserPromptSubmit hook: zero-token shortcuts for mechanical PM chores.
 
   mp [PR ...]    -> tools/merge_pr.py   (merge + clean up; typing it is the PO's OK to merge)
-  ct [TASK-ID]   -> tools/close_task.py (close a task after review Approved + QA Passed)
+  ct [TASK-ID] [--pr] [--handoff] -> tools/close_task.py (close a task after review Approved + QA Passed)
 
 A matching prompt is blocked (never sent to the model, so it costs no tokens) and the script's report is
 shown to the PO as the block reason. Any other prompt passes through untouched. Standard library only.
@@ -17,7 +17,7 @@ from pathlib import Path
 
 SHORTCUTS = {
     "mp": (re.compile(r"^\s*mp((?:\s+#?\d+)*)\s*$"), "merge_pr.py"),
-    "ct": (re.compile(r"^\s*ct((?:\s+E\d\d-T\d\d)?)\s*$", re.I), "close_task.py"),
+    "ct": (re.compile(r"^\s*ct((?:\s+E\d\d-T\d\d)?(?:\s+--(?:pr|handoff))*)\s*$", re.I), "close_task.py"),
 }
 
 
@@ -25,7 +25,7 @@ def match(prompt: str) -> tuple[str, list[str]] | None:
     for pattern, script in SHORTCUTS.values():
         m = pattern.match(prompt)
         if m:
-            return script, m.group(1).upper().split() if "close_task" in script else m.group(1).split()
+            return script, [a.lower() if a.startswith("--") else a.upper() for a in m.group(1).split()] if "close_task" in script else m.group(1).split()
     return None
 
 

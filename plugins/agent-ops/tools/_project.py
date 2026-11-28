@@ -79,7 +79,8 @@ def parse_merge_settings(text: str) -> tuple[str, list[str] | None]:
         raise ConfigError(f"{CONFIG_NAME}: [merge] phải là bảng")
     unknown = sorted(set(section) - {"base", "required_checks", "local_stamp_dir"})
     if unknown:
-        raise ConfigError(f"{CONFIG_NAME}: [merge] có khoá lạ: {', '.join(unknown)}")
+        raise ConfigError(f"{CONFIG_NAME}: [merge] có khoá lạ: {', '.join(unknown)} (khoá mới thì cập nhật plugin: "
+                          "`/plugin marketplace update`, rồi mở phiên mới)")
     base = section.get("base", DEFAULT_BASE_BRANCH)
     checks = section.get("required_checks")
     if not isinstance(base, str) or not base.strip():

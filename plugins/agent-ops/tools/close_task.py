@@ -1,6 +1,8 @@
 """Close a task when review is Approved and QA Passed, without a model (token optimisation).
 
-Usage: python3 "${CLAUDE_PLUGIN_ROOT}/tools/close_task.py" [TASK-ID]
+Usage: python3 "${CLAUDE_PLUGIN_ROOT}/tools/close_task.py" [TASK-ID] [--pr] [--handoff] [--next TEXT]
+  --pr: open the PR (or mark an existing draft ready) after the push.
+  --handoff: rewrite <mgmt>/HANDOFF.md, keeping its open next steps; --next adds one.
   No TASK-ID: taken from the current branch name when it names exactly one task.
 Shortcut in Claude Code: type `ct [TASK-ID]` (hooks/scripts/task_shortcuts.py).
 
@@ -11,6 +13,8 @@ Any failed check: nothing is changed, every failed check is reported. Standard l
 """
 from __future__ import annotations
 
+import argparse
+import json
 import os
 import re
 import subprocess
@@ -19,6 +23,7 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import handoff  # noqa: E402
 from _project import ConfigError, merge_settings, mgmt_rel, project_root  # noqa: E402
 
 REPO = project_root()
@@ -150,12 +155,48 @@ def open_drs(sec6: str) -> list[str]:
     return bad
 
 
+def pr_body(tid: str, text: str, verdict: str, claude: bool) -> str:
+    """PR description built from the task file."""
+    subtasks = [f"- {c[0]}: {c[1]}" for c in (
+        [x.strip() for x in l.strip().strip("|").split("|")] for l in text.splitlines()
+        if l.startswith(f"| {tid}-S")) if len(c) > 1]
+    parts = [f"Task {tid}: {frontmatter(text).get('title', '')}", f"Kết quả: {verdict}."]
+    if subtasks:
+        parts.append("Subtask:\n" + "\n".join(subtasks))
+    if claude:
+        parts.append("🤖 Generated with [Claude Code](https://claude.com/claude-code)")
+    return "\n\n".join(parts) + "\n"
+
+
+def open_pr(base: str, branch: str, title: str, body: str) -> tuple[str, str]:
+    """(PR number, note). Creates the PR when the branch has none; marks a draft ready."""
+    view = sh("gh", "pr", "view", branch, "--json", "number,isDraft,state", check=False)
+    if view.returncode == 0:
+        pr = json.loads(view.stdout)
+        if pr["state"] == "OPEN":
+            if pr["isDraft"]:
+                ready = sh("gh", "pr", "ready", str(pr["number"]), check=False)
+                if ready.returncode != 0:
+                    return str(pr["number"]), "KHÔNG bỏ được nháp: " + ready.stderr.strip()[-200:]
+                return str(pr["number"]), "đã bỏ nháp"
+            return str(pr["number"]), "PR đã có"
+    res = sh("gh", "pr", "create", "--base", base, "--head", branch, "--title", title, "--body", body, check=False)
+    m = re.search(r"/pull/(\d+)", res.stdout)
+    if res.returncode != 0 or not m:
+        return "", "KHÔNG mở được PR: " + (res.stderr or res.stdout).strip()[-200:]
+    return m.group(1), "đã mở PR"
+
+
 def main(argv: list[str]) -> int:
-    if any(a in ("-h", "--help") for a in argv):
-        print(__doc__)
-        return 0
+    parser = argparse.ArgumentParser(prog="close_task.py", description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("task_id", nargs="?")
+    parser.add_argument("--pr", action="store_true")
+    parser.add_argument("--handoff", action="store_true")
+    parser.add_argument("--next", dest="next_step")
+    args = parser.parse_args(argv)
     branch = out("git", "branch", "--show-current")
-    tid = argv[0] if argv else infer_id(branch)
+    tid = args.task_id or infer_id(branch)
     task_md = find_task(tid)
     tdir = task_md.parent
     rel = lambda p: str(p.relative_to(REPO))  # noqa: E731
@@ -237,19 +278,43 @@ def main(argv: list[str]) -> int:
 
     co = [l for l in out("git", "log", "-1", "--format=%B").splitlines() if l.startswith("Co-Authored-By:")]
     msg = f"chore(tasks): QA passed, close {tid} [{tid}]" + ("\n\n" + "\n".join(co) if co else "")
-    sh("git", "add", *[rel(p) for p in changed], f"{MGMT}/BOARD.md")
+    # Subtask files may already be `done` but uncommitted (prepare_close.py); other files stay untouched.
+    docs = {*changed, *tdir.glob(f"{tid}-S*.md"), *([log_md] if log_md.exists() else [])}
+    sh("git", "add", "--", *sorted(rel(p) for p in docs), f"{MGMT}/BOARD.md")
     sh("git", "commit", "-m", msg)
     sha = out("git", "rev-parse", "--short", "HEAD")
     push = sh("git", "push", "origin", "HEAD", check=False)
-    pr = sh("gh", "pr", "view", "--json", "number", "-q", ".number", check=False).stdout.strip()
+    note = ""
+    if args.pr and push.returncode == 0:
+        title = f"{tid}: {fm.get('title') or branch}"
+        pr, note = open_pr(base, branch, title, pr_body(tid, text, verdict, any("Claude" in l for l in co)))
+    else:
+        pr = sh("gh", "pr", "view", "--json", "number", "-q", ".number", check=False).stdout.strip()
 
     print(f"Đã đóng {tid} ({old} → done): commit {sha}" + ("" if push.returncode == 0 else " — PUSH LỖI: "
                                                        + push.stderr.strip()[-200:]))
     print(f"build_inbox --check: {chk_line}")
+    if note:
+        print(f"PR {pr}: {note}" if pr else note)
     if epic_all_done:
         print(f"Mọi task của epic {tid[:3]} đã done: cân nhắc đóng epic (không tự đổi).")
-    print(f"Bước tiếp: mp {pr}" if pr else "Bước tiếp: mở PR rồi gõ `mp <số PR>`.")
-    return 0
+    failed = push.returncode != 0 or note.startswith("KHÔNG")
+    if push.returncode != 0:
+        nxt = f"push lại (`git push origin HEAD`, đang thiếu commit {sha}) rồi mới merge"
+    elif note.startswith("KHÔNG bỏ được nháp"):
+        nxt = f"bỏ nháp PR #{pr} rồi gõ `mp {pr}`"
+    else:
+        nxt = f"mp {pr}" if pr else "mở PR rồi gõ `mp <số PR>`"
+    if args.handoff or args.next_step:
+        fresh = [f"- Đã đóng {tid} (commit {sha}{', PR #' + pr if pr else ''}); " 
+                 + (f"CÒN LỖI: {nxt}." if failed else f"chờ PO: {nxt}.")]
+        if args.next_step:
+            fresh.append(f"- Bước tiếp: {args.next_step}")
+        handoff.write(REPO / MGMT / "HANDOFF.md", "close_task.py", fresh)
+        print(f"Đã ghi {MGMT}/HANDOFF.md.")
+    print(f"Bước tiếp: {nxt}")
+    print("Task xong: nên chạy `/clear` trước khi sang việc mới.")
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":
