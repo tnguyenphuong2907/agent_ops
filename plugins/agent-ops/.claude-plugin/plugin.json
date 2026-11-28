@@ -1,6 +1,6 @@
 {
   "name": "agent-ops",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Reusable management system for AI agent teams: task board, decision requests, lessons, daily cadence, zero-token shortcuts (ct, mp) and context guard.",
   "author": { "name": "PO" }
 }

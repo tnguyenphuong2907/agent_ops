@@ -23,13 +23,14 @@ Mỗi lượt agent của phiếu ghi `~NK` vào Lịch sử; tổng quá 200K t
 | Model | Việc |
 |---|---|
 | `haiku` | Cơ học: tra cứu, tìm file, tóm tắt một file, cập nhật trạng thái task/BOARD, chạy script kiểm tra (`build_inbox.py --check`…) |
-| `sonnet` (mặc định) | PRD/user story, phản biện tính năng (idea-reviewer), kế hoạch/báo cáo ngày, code theo task, test, UI, review code không đụng bảo mật, vòng 2 phản biện chỉ kiểm điểm cũ |
-| `opus` | Kiến trúc/ADR, schema và migration, phiếu DR loại 1 (soạn và phản biện vòng 1), review code đụng auth/khoá/mã hoá/dữ liệu người dùng (nguyên tắc bảo mật khoá/bí mật của dự án), bug khó qua nhiều tầng, hoặc khi lần giao trước bằng model thấp hơn bị trả lại vì thiếu sâu |
+| `sonnet` (mặc định) | PRD/user story, phản biện tính năng (idea-reviewer), kế hoạch/báo cáo ngày, code theo task (kể cả code đụng dữ liệu người dùng), test, UI, review code không đụng bảo mật, vòng 2 phản biện chỉ kiểm điểm cũ |
+| `opus` | Lập kế hoạch cho subtask `plan: opus`, kiến trúc/ADR, schema và migration, phiếu DR loại 1 (soạn và phản biện vòng 1), review code đụng auth/khoá/mã hoá/dữ liệu người dùng (nguyên tắc bảo mật khoá/bí mật của dự án), bug khó qua nhiều tầng, hoặc khi lần giao trước bằng model thấp hơn bị trả lại vì thiếu sâu |
 
 - Chọn khác mặc định của agent thì ghi lý do một dòng trong brief. Kết quả kém vì model thấp → giao lại bằng model cao hơn, và ghi `/lesson` nếu lặp lại.
 - **`effort`:** việc mức `haiku` truyền `effort: "low"` (model không hỗ trợ thì bỏ tham số); vòng 2 phản biện/review chỉ kiểm điểm cũ và QA kiểm lại một điểm truyền `effort: "medium"`; còn lại để mặc định. Kết quả kém vì `effort` thấp → giao lại không đặt `effort`.
 - **Việc vặt qua skill fork:** đóng task (`/close-task`), merge + dọn sau merge (`/merge-pr`) chạy trong skill `context: fork` + `model: haiku`: phiên chính chỉ nhận báo cáo ngắn. `/merge-pr` chỉ chạy khi PO gõ (là đồng ý merge). Logic ở `${CLAUDE_PLUGIN_ROOT}/tools/close_task.py`, `${CLAUDE_PLUGIN_ROOT}/tools/merge_pr.py`; PO gõ `ct [task-id]`, `mp [PR...]` thì hook `${CLAUDE_PLUGIN_ROOT}/hooks/scripts/task_shortcuts.py` chạy script không gọi model (0 token).
-- **Chia model theo bước:** scout `haiku` (gom ngữ cảnh, ghi context pack) → plan `opus` → thực thi `sonnet` → ghi chép cơ học `haiku`. Chỉ chia khi nguồn cần đọc > ~40K token hoặc cần suy nghĩ sâu, vì mỗi spawn tốn ~15–30K token khởi động; việc nhỏ giao một agent. `haiku` không viết PRD/ADR/DR/thiết kế.
+- **Chia model theo bước:** scout `haiku` (gom ngữ cảnh, ghi context pack) → plan `opus` → thực thi `sonnet` → ghi chép cơ học `haiku`. Mỗi spawn tốn ~15–30K token khởi động: scout và ghi chép chỉ tách khi đáng; việc nhỏ giao một agent. `haiku` không viết PRD/ADR/DR/thiết kế.
+- **Bước plan (bắt buộc với subtask `plan: opus`):** phiên chính spawn đúng agent dev của subtask với `model: opus`, brief có dòng `Chế độ: lập kế hoạch` và mã subtask; agent chỉ viết mục "Kế hoạch" rồi trả về. Sau đó spawn agent dev **mới** với `model: sonnet` để code theo kế hoạch. Dev chạy `opus` để **code** chỉ khi lần giao bằng sonnet bị trả lại hoặc bug khó qua nhiều tầng, và brief ghi `Lý do opus: …`. Hook `brief_guard.py` chặn spawn sai các điểm này.
 - **Gom lượt cùng agent:** khi thứ tự cho phép, giao liền nhau (trong 5 phút) các lượt cùng loại agent và cùng model để dùng lại cache phần đầu (~15K token); không đổi thứ tự phụ thuộc chỉ vì việc này.
 
 ## Quy tắc 9: đổi việc, HANDOFF và /clear

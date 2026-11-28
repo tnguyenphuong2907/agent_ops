@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0
+
+- Plan step: subtask frontmatter `plan: opus` and section `## Kế hoạch`; `/run-task` runs an opus planning pass, then sonnet codes. `check_task.py` and `task_step.py` stop on a missing plan.
+- Hook `brief_guard.py` (PreToolUse on agent spawns): denies a task brief without the four brief lines, an opus dev run without `Lý do opus:`, and coding a `plan: opus` subtask before its plan.
+- Tools `ctx_pack.py` (source excerpts of one subtask), `task_step.py` (status, clock, history, hours), `dod_report.py` (Definition of Done facts); `token_stats.py --session`.
+- Execution defaults to sonnet, also for code touching user data. Agents batch reads, keep outputs under the tool limit and avoid commands the usual deny rules block.
+- **Action needed:** add tool shims for `ctx_pack.py`, `task_step.py`, `dod_report.py`; add `plan:`, `## Kế hoạch` to the project's subtask template and the "Ai" column to its context pack template.
+
 ## 0.3.1
 - `merge_pr.py`: optional `[merge] local_stamp_dir` gate (local check stamp instead of CI check runs).
 

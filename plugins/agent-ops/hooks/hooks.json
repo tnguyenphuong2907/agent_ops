@@ -29,6 +29,16 @@
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}\"/hooks/scripts/no-unbounded-wait.sh"
           }
         ]
+      },
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/scripts/brief_guard.py 2>/dev/null || true",
+            "timeout": 10
+          }
+        ]
       }
     ]
   }

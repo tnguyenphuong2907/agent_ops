@@ -17,6 +17,7 @@ Luật đầy đủ: `management/README.md`. Tóm tắt thao tác:
 6. AC **dẫn mã nguồn** (D-xxx, mã yêu cầu, mục tài liệu), không diễn giải lại luật: câu diễn giải dễ lệch nguồn.
 7. Subtask thiết kế hợp đồng API đặt `selfcheck: api`, đặc tả màn đặt `selfcheck: ui`; "Điều kiện xong" ghi "bảng Tự kiểm đã điền đủ" (mẫu `${CLAUDE_PLUGIN_ROOT}/templates/design-selfcheck.md`).
 8. Chạy `python3 "${CLAUDE_PLUGIN_ROOT}/tools/check_task.py" <task> --stage review` trước khi giao review, và bỏ `--stage` trước khi đóng task; sửa hết dòng `lỗi:`, đọc từng dòng `cảnh báo:`.
+9. Đặt `plan: opus` cho subtask code có **một** trong các điểm: transaction hoặc ca đua; luồng nhiều tầng/nhiều trạng thái (nộp, lỗi, thử lại, rời trang); nguồn cần đọc > ~40K token; đụng auth/khoá/mã hoá. Subtask CRUD, khung hợp đồng, E2E theo mẫu có sẵn: để trống. Ghi lý do một dòng ở "Việc cần làm".
 
 ## Chia nhỏ — câu hỏi kiểm tra
 - Task lớn làm xong trong **1 ngày**? Nếu không → tách. Task luồng: ≤ 3 ngày, ≤ 6 subtask? Màn chạy được với BE thật ở cuối task?
@@ -59,5 +60,7 @@ Không viết câu hỏi trực tiếp trong task. Tạo **phiếu DR** theo ski
 7. **Reviewer sẽ kiểm:** bảng tự kiểm áp dụng và điểm riêng của lượt này. Brief **người làm** ghi cùng danh sách đó, không để chỉ người rà biết.
 8. **Đầu ra bắt buộc:** ví dụ bảng Tự kiểm đã điền, kết quả `check_task.py`.
 9. **Đóng việc:** ai đánh dấu cột "Đã sửa?" và ai ghi dòng `**Kết quả:**`, theo quyền theo mục của dự án; gộp các điểm còn lại vào một lượt.
+
+Hook `brief_guard.py` chặn brief giao agent (trừ `pm`, lượt `haiku`) có mã task mà thiếu một trong bốn dòng `Quyết định đang treo:`, `Reviewer sẽ kiểm:`, `Đầu ra bắt buộc:`, `Đóng việc:` (không có gì thì ghi `không có`). Lượt lập kế hoạch: brief mở bằng `Chế độ: lập kế hoạch` (luật: skill `agent-ops:agent-orchestration` quy tắc 8).
 
 Người rà soát vòng sau vẫn được nêu phát hiện mới, nhưng ghi rõ "mới ở vòng n".

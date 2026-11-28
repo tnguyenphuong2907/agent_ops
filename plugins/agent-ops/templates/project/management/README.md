@@ -112,7 +112,7 @@ Mục 7 và 8 nằm ở `log.md` cạnh `task.md` (mẫu `log.md` của plugin).
 9. Lịch sử chỉ được **thêm**, không sửa/xoá dòng cũ.
 10. Cuối mỗi ngày, PM chạy `/agent-ops:daily-report`; đầu ngày chạy `/agent-ops:daily-plan`.
 11. **Truy vết quyết định hai chiều:** mỗi D-xxx trong `decisions.md` ghi các task/epic/ADR chịu ảnh hưởng ở cột *Áp dụng cho*; mỗi task ghi các D-xxx liên quan trong `links`. Hai phía phải khớp nhau.
-12. **Ghi giờ:** chạy `date` lúc bắt đầu và lúc kết thúc mỗi subtask, ghi cả hai vào Tiến trình rồi tính `actual_hours` từ khoảng đó; không ước chừng.
+12. **Ghi giờ:** bắt đầu và kết thúc mỗi subtask bằng `task_step.py <subtask> start|done` của plugin (lấy giờ thật, đổi trạng thái, ghi Lịch sử, tính `actual_hours`); không ước chừng.
 13. **Đọc task theo mục:** không đọc nguyên `task.md`. Chạy `grep -n "^## " task.md` rồi đọc đúng đoạn (`sed -n a,bp` hoặc `Read` với `offset`/`limit`). Mỗi vai đọc:
 
     | Vai | Đọc | Không đọc (trừ khi brief chỉ định) |
