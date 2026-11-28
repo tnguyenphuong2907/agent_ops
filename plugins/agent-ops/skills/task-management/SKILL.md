@@ -13,11 +13,12 @@ Luật đầy đủ: `management/README.md`. Tóm tắt thao tác:
 2. Task: `management/tasks/E<nn>-<slug>/E<nn>-T<nn>-<slug>/task.md` (copy `templates/task.md`) và `log.md` cạnh nó (copy `templates/log.md`: mục 7 Trao đổi, mục 8 Lịch sử), tạo thêm thư mục `evidence/`.
 3. Subtask: file `E<nn>-T<nn>-S<nn>-<slug>.md` cạnh `task.md` (copy `templates/subtask.md`) — hoặc chỉ là một dòng trong bảng Subtasks nếu thật sự nhỏ (≤ 30 phút).
 4. Task luồng: gán `flow: F<nn>` ở frontmatter và thêm/cập nhật dòng của luồng trong `management/flows.md`; slice của epic khác nằm trong task luồng tiêu thụ nó đầu tiên.
-5. Thêm dòng vào bảng task của `epic.md` rồi chạy `python3 "${CLAUDE_PLUGIN_ROOT}/tools/build_board.py"` (BOARD sinh tự động, không sửa tay; xem đầu file BOARD). Luật nhánh: mục Quy ước Git trong `CLAUDE.md` của dự án.
+5. Thêm dòng vào bảng task của `epic.md` rồi chạy `python3 "${CLAUDE_PLUGIN_ROOT}/tools/build_board.py"` (BOARD sinh tự động, không sửa tay; xem đầu file BOARD). Luật nhánh: mục Quy ước Git trong `CLAUDE.md` của dự án; tạo nhánh từ `origin/<base>` kèm `--no-track`.
 6. AC **dẫn mã nguồn** (D-xxx, mã yêu cầu, mục tài liệu), không diễn giải lại luật: câu diễn giải dễ lệch nguồn.
 7. Subtask thiết kế hợp đồng API đặt `selfcheck: api`, đặc tả màn đặt `selfcheck: ui`; "Điều kiện xong" ghi "bảng Tự kiểm đã điền đủ" (mẫu `${CLAUDE_PLUGIN_ROOT}/templates/design-selfcheck.md`).
 8. Chạy `python3 "${CLAUDE_PLUGIN_ROOT}/tools/check_task.py" <task> --stage review` trước khi giao review, và bỏ `--stage` trước khi đóng task; sửa hết dòng `lỗi:`, đọc từng dòng `cảnh báo:`.
 9. Đặt `plan: opus` cho subtask code có **một** trong các điểm: transaction hoặc ca đua; luồng nhiều tầng/nhiều trạng thái (nộp, lỗi, thử lại, rời trang); nguồn cần đọc > ~40K token; đụng auth/khoá/mã hoá. Subtask CRUD, khung hợp đồng, E2E theo mẫu có sẵn: để trống. Ghi lý do một dòng ở "Việc cần làm".
+10. Task có hợp đồng API: architect viết hợp đồng ở `contract.md` cạnh `task.md` (mẫu `templates/contract.md`), mục 2 chỉ tóm tắt và trỏ tới; context pack trỏ đúng mục/dòng của `contract.md`. Task đã `done` không tách ngược.
 
 ## Chia nhỏ — câu hỏi kiểm tra
 - Task lớn làm xong trong **1 ngày**? Nếu không → tách. Task luồng: ≤ 3 ngày, ≤ 6 subtask? Màn chạy được với BE thật ở cuối task?
@@ -26,6 +27,10 @@ Luật đầy đủ: `management/README.md`. Tóm tắt thao tác:
 - Task kiểu "đồng bộ/chuyển quy tắc": mục Tiến trình ghi lệnh `grep` theo ID quy tắc (PT-xx, D-xxx, tên mục) chạy sau khi sửa, số kết quả và danh sách file (không chép từng dòng). "Chuyển" = bản cũ thay bằng ≤ 1 câu + link trong cùng subtask, không xoá trắng. Người rà: reviewer của task.
 - Mục 7 của task chỉ trỏ tới đặc tả và bảng file chủ trong `CLAUDE.md` (link, không chép luật); dev gắn nhãn mỗi lệch với thiết kế `GAP` / `CONFLICT` / `WRONG-ASSUMPTION`.
 - Thứ tự cho task luồng: S01 BE khung hợp đồng + `openapi.json` → S02 BE handler + lỗi + test ‖ S03 FE màn bằng kiểu sinh + mock route → S04 E2E với BE thật.
+- Thứ tự cho task **thiết kế** luồng: AC → hợp đồng API → **duyệt hợp đồng** → đặc tả màn → duyệt màn → một lượt sửa → QA. Đặc tả màn không viết trước khi hợp đồng được duyệt.
+- **Gom Minor/Nit:** phát hiện Minor, Nit của mọi lượt review (hợp đồng, màn) sửa trong **một** lượt trước QA; chỉ Blocker/Major trả lại ngay.
+- **Prototype** chỉ cập nhật khi PO cần duyệt màn đó; không thì đặc tả màn là nguồn, ghi một dòng "prototype không cập nhật".
+- Đọc một mục của task: `python3 "${CLAUDE_PLUGIN_ROOT}/tools/task_section.py" <task> <số mục | contract | tên tiêu đề>`.
 
 ## Đổi trạng thái
 - Sửa `status` ở frontmatter **và** thêm một dòng vào mục Lịch sử (`log.md`; task tạo trước 2026-11-26: cuối `task.md`): `| YYYY-MM-DD HH:MM | <agent> | <cũ> → <mới>: <lý do ngắn> |`.
@@ -44,7 +49,7 @@ Không viết câu hỏi trực tiếp trong task. Tạo **phiếu DR** theo ski
 - Mỗi phát hiện có **số** (`#n`), mức (Blocker/Major/Minor) và **trạng thái**: `mở` / `đã sửa` / `không sửa — lý do` / `để PO quyết`.
 - Lý do quan trọng (vì sao bỏ một hướng, vì sao chấp nhận rủi ro) viết ra file, không chỉ để trong báo cáo trả về.
 
-**Phiên chính viết brief cho agent sau** (mọi lượt giao trong task: làm → review → sửa → QA), ≤ 16 dòng:
+**Phiên chính viết brief cho agent sau** (mọi lượt giao trong task: làm → review → sửa → QA), ≤ 16 dòng, dựng khung bằng `python3 "${CLAUDE_PLUGIN_ROOT}/tools/brief.py" <subtask>`:
 1. Vòng thứ mấy, việc cần làm, và chỉ đọc mục nào (ví dụ "vòng 2: đọc mục 4 vòng 1, sửa #3, #5, #7").
 2. Các phát hiện **đã chốt, không mở lại** (theo số).
 3. Điểm **còn bất đồng**: giữ nguyên trong file, để PO quyết, không tranh luận lại.

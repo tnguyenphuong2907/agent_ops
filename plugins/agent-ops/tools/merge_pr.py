@@ -22,10 +22,10 @@ import re
 import subprocess
 import sys
 import time
-from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import handoff  # noqa: E402
 from _project import CONFIG_NAME, ConfigError, merge_settings, mgmt_rel, parse_local_stamp_dir, parse_merge_settings, project_root  # noqa: E402
 
 REPO = project_root()
@@ -307,11 +307,11 @@ def main(argv: list[str]) -> int:
     print("\n".join(report))
 
     if rows:
-        handoff = [f"# Handoff ({date.today().isoformat()}, sau merge_pr.py)", ""]
-        handoff += [f"- #{n} {b}: {r}" + (f" ({why})" if why else "") for n, b, r, why in rows]
-        handoff += [f"- Trạng thái {base}: {head}; build_inbox --check: {chk_line}",
-                    "- Bước tiếp: chọn task `ready` kế tiếp theo backlog (PM)."]
-        (REPO / MGMT / "HANDOFF.md").write_text("\n".join(handoff[:15]) + "\n", encoding="utf-8")
+        fresh = [f"- #{n} {b}: {r}" + (f" ({why})" if why else "") for n, b, r, why in rows]
+        fresh.append(f"- Trạng thái {base}: {head}; build_inbox --check: {chk_line}")
+        size = handoff.write(REPO / MGMT / "HANDOFF.md", "merge_pr.py", fresh, {r[0] for r in rows})
+        if size > handoff.MAX_LINES:
+            print(f"HANDOFF.md dài {size} dòng (> {handoff.MAX_LINES}): đọc lại và bỏ dòng đã xong.")
     return 0
 
 

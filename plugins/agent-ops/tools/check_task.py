@@ -149,6 +149,11 @@ def warnings(task_md: Path, tid: str, base: str | None) -> list[str]:
             num = int(m.group(1)) if m else num
         if num in (1, 2) and not line.lstrip().startswith(">"):
             found += line_warnings(f"task.md:{i}", line, maxima)
+    contract = task_md.parent / "contract.md"
+    if contract.is_file():
+        for i, line in enumerate(contract.read_text(encoding="utf-8").splitlines(), 1):
+            if not line.lstrip().startswith(">"):
+                found += line_warnings(f"contract.md:{i}", line, maxima)
     if base:
         mb = ct.sh("git", "merge-base", base, "HEAD", check=False)
         if mb.returncode != 0:
@@ -185,8 +190,9 @@ def main(argv: list[str]) -> int:
     try:
         base = args.base or ct.merge_settings(ct.REPO)[0]
     except ct.ConfigError as e:
-        print(f"Dừng: {e}")
-        return 2
+        # Only warnings need the base here; merge gates stay strict in merge_pr.py / close_task.py.
+        print(f"cảnh báo: {e} (bỏ quét file đã đổi; bản plugin đang chạy có thể cũ hơn cấu hình)")
+        base = None
     for w in warnings(task_md, args.task_id, base):
         print(f"cảnh báo: {w}")
     for e in errors:

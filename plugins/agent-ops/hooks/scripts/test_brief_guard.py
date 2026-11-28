@@ -78,3 +78,23 @@ class Guard(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DecisionRequestModel(unittest.TestCase):
+    def check(self, prompt, role="architect", model="opus"):
+        return guard.problems(call(role=role, model=model, prompt=prompt), Path("."))
+
+    def test_opus_dr_without_rule_denied(self):
+        for prompt in ("Soạn DR-081 mục 2-6", "Phản biện phiếu DR-081 vòng 1"):
+            for role in ("architect", "decision-reviewer"):
+                self.assertTrue(any("quy tắc 1.x" in p for p in self.check(prompt, role)), prompt)
+
+    def test_allowed(self):
+        for kw in ({"prompt": "Soạn DR-081, quy tắc 1.5 (bảo mật)"}, {"prompt": "Soạn DR-081", "model": "sonnet"},
+                   {"prompt": "Thiết kế kiến trúc theo DR-079"},
+                   {"prompt": "Soạn DR-081", "role": "product-analyst"}):
+            self.assertEqual(self.check(**kw), [], kw)
+
+    def test_placeholder_denied(self):
+        found = self.check("Làm E09-T01-S02: <điền việc>\n" + LINES, role="qa", model="sonnet")
+        self.assertIn("chưa điền", found[0])

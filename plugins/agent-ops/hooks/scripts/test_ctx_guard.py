@@ -65,5 +65,12 @@ class CtxGuard(unittest.TestCase):
             self.assertEqual((res.returncode, res.stdout), (0, ""), payload)
 
 
+    def test_plan_approved_always_reminds(self):
+        res = subprocess.run([sys.executable, "-I", str(HOOK), "plan-approved"], input="{}",
+                             capture_output=True, text=True, check=False)
+        out = json.loads(res.stdout)["hookSpecificOutput"]
+        self.assertEqual(out["hookEventName"], "PostToolUse")
+        self.assertIn("/clear", out["additionalContext"])
+
 if __name__ == "__main__":
     unittest.main()

@@ -66,6 +66,15 @@ Gốc dự án được tìm theo thứ tự: env `AGENT_OPS_PROJECT_DIR`, `CLAU
 
 Gọi trực tiếp: `python3 "${CLAUDE_PLUGIN_ROOT}/tools/build_board.py" --check`. Để giữ lệnh cũ `python3 management/tools/<x>.py`, đặt shim (~15 dòng) ở `<management>/tools/<x>.py`: đọc `plugin_path` (hoặc env `AGENT_OPS_PLUGIN_PATH`), đặt `AGENT_OPS_PROJECT_DIR`, rồi `runpy.run_path(<plugin>/tools/<x>.py, run_name="__main__")`.
 
+| Tool | Việc |
+|---|---|
+| `brief.py <subtask>` | khung brief giao agent |
+| `ctx_pack.py <subtask>` | đoạn nguồn của subtask |
+| `task_section.py <task> <mục>` | một mục của task / `contract.md` |
+| `task_step.py <subtask> start\|done` | trạng thái, giờ, Lịch sử |
+| `dod_report.py <task>`, `prepare_close.py <task>`, `close_task.py [task]` | đóng task |
+| `dr_apply.py DR-xxx` | ghi quyết định tạm |
+
 ## Test
 
 ```

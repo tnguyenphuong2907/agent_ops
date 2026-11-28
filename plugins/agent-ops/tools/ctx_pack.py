@@ -4,11 +4,15 @@ Usage: python3 "${CLAUDE_PLUGIN_ROOT}/tools/ctx_pack.py" SUBTASK-ID [--part N]
 Reads the subtask file and `context.md` (table "Nguồn cần đọc": File | Dòng/mục | Vì sao | Ai).
 Rows whose "Ai" names the subtask (`S02`, a range `S01–S05`, `mọi vai`, or empty) are printed with
 line numbers. Acceptance-criteria lines are narrowed to those on the subtask's "Phụ trách:" line.
-Output is split into parts below the tool-output limit. Standard library only.
+A row whose "Dòng/mục" says `chữ ký` prints the signatures of that .py/.ts file; subtasks with
+`selfcheck: api` get them for every code row without line numbers. Headings of the task's
+`contract.md` are listed with their line ranges.
+Output is split into parts of at most PART_BYTES bytes (the tool-output limit). Standard library only.
 """
 from __future__ import annotations
 
 import argparse
+import ast
 import re
 import sys
 from pathlib import Path
@@ -16,7 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import close_task as ct  # noqa: E402
 
-PART_CHARS = 28_000
+PART_BYTES = 28_000  # UTF-8 bytes: Vietnamese text is much longer in bytes than in characters
 ALIAS = re.compile(r"`(\w+)`\s*=\s*(?:\[[^\]]*\]\()?`?([\w./-]+\.\w+)")
 RANGE = re.compile(r"(?<![\w.-])(\d+)\s*[–-]\s*(\d+)(?![\w.])")
 AC_LINE = re.compile(r"^\W*(?:\[[ x]\]\s*)?\**([A-Z]\w*)-AC(\d+)\b")
@@ -81,24 +85,72 @@ def excerpt(lines: list[str], start: int, end: int, acs: set[tuple[str, int]]) -
     return out
 
 
-def split_parts(blocks: list[str], limit: int = PART_CHARS) -> list[str]:
-    """Group blocks into parts of at most `limit` characters, cutting oversized blocks at line ends."""
+def size(text: str) -> int:
+    return len(text.encode("utf-8"))
+
+
+def split_parts(blocks: list[str], limit: int = PART_BYTES) -> list[str]:
+    """Group blocks into parts of at most `limit` bytes, cutting oversized blocks at line ends."""
     parts, cur = [], ""
     for block in blocks:
         for line in block.splitlines(keepends=True):
-            while len(line) > limit:
+            while size(line) > limit:
                 if cur:
                     parts.append(cur)
                     cur = ""
-                parts.append(line[:limit])
-                line = line[limit:]
-            if len(cur) + len(line) > limit:
+                head = line.encode("utf-8")[:limit].decode("utf-8", errors="ignore")
+                parts.append(head)
+                line = line[len(head):]
+            if size(cur) + size(line) > limit:
                 parts.append(cur)
                 cur = ""
             cur += line
     if cur:
         parts.append(cur)
     return parts
+
+
+TS_EXPORT = re.compile(r"^export\s+(default\s+)?(async\s+)?(function|const|type|interface|class|enum)\b")
+
+
+def signatures(name: str, source: str) -> list[str]:
+    """Numbered declaration lines of a Python or TypeScript file; empty when none can be read."""
+    lines = source.splitlines()
+    if name.endswith((".ts", ".tsx")):
+        return [f"{i}: {l}" for i, l in enumerate(lines, 1) if TS_EXPORT.match(l)]
+    if not name.endswith(".py"):
+        return []
+    try:
+        tree = ast.parse(source)
+    except (SyntaxError, ValueError):
+        return []
+    keep: set[int] = set()
+
+    def visit(body: list, in_class: bool) -> None:
+        for node in body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                first = min([d.lineno for d in node.decorator_list] + [node.lineno])
+                last = max(node.body[0].lineno - 1, node.lineno)
+                keep.update(range(first, last + 1))
+                if isinstance(node, ast.ClassDef):
+                    visit(node.body, True)
+            elif in_class and isinstance(node, (ast.Assign, ast.AnnAssign)):
+                keep.update(range(node.lineno, (node.end_lineno or node.lineno) + 1))
+
+    visit(tree.body, False)
+    return [f"{i}: {lines[i - 1]}" for i in sorted(keep)]
+
+
+def headings(text: str) -> list[str]:
+    """`title (dòng a–b)` of every `##` / `###` section of a document."""
+    lines = text.splitlines()
+    heads = [(i, len(m.group(1)), m.group(2)) for i, l in enumerate(lines, 1)
+             if (m := re.match(r"(##+) (.*)", l))]
+    out = []
+    for n, (start, level, title) in enumerate(heads):
+        end = next((s - 1 for s, lv, _ in heads[n + 1:] if lv <= level), len(lines))
+        out.append(f"{'  ' * (level - 2)}- {title} (dòng {start}–{end})")
+    return out
 
 
 # ---------- main ----------
@@ -124,12 +176,19 @@ def build(sub_id: str) -> list[str]:
         if sec and sec.group(1).strip():
             blocks.append(f"=== context.md § {extra}\n{sec.group(1).strip()}\n")
     acs = owned_acs(sub_text)
+    api = "api" in re.split(r"[,\s]+", ct.frontmatter(sub_text).get("selfcheck", ""))
     manual = []
     for name_cell, where, why in source_rows(context, m.group(2)):
         name = name_cell.strip("` ")
         rel = aliases.get(name, name)
         path = ct.REPO / rel
         ranges = RANGE.findall(where)
+        if path.is_file() and ("chữ ký" in where or (api and not ranges)):
+            sigs = signatures(rel, path.read_text(encoding="utf-8", errors="replace"))
+            if sigs:
+                blocks.append(f"=== {rel} chữ ký ({why})\n" + "\n".join(sigs) + "\n")
+                if "chữ ký" in where:
+                    continue
         if not path.is_file() or not ranges:
             manual.append(f"- {rel}: {where} ({why})")
             continue
@@ -140,6 +199,10 @@ def build(sub_id: str) -> list[str]:
         for a, b in ranges:
             body = "\n".join(excerpt(lines, int(a), int(b), acs))
             blocks.append(f"=== {rel} dòng {a}–{b} ({why}){stale}\n{body}\n")
+    contract = tdir / "contract.md"
+    if contract.is_file():
+        toc = "\n".join(headings(contract.read_text(encoding="utf-8")))
+        blocks.append(f"=== {contract.relative_to(ct.REPO)} (hợp đồng API: mở đúng mục cần)\n{toc}\n")
     if manual:
         blocks.append("=== Mở tay khi cần (không có số dòng)\n" + "\n".join(manual) + "\n")
     return blocks

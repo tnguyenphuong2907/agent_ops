@@ -3,6 +3,8 @@
 Reads the hook JSON on stdin, takes `transcript_path`, finds the last assistant usage and,
 when input context (input + cache read + cache write) exceeds the threshold, prints a hook
 JSON with a short reminder for the model (additionalContext) and the user (systemMessage).
+With the argument `plan-approved` (PostToolUse on ExitPlanMode) it always reminds to write the
+handoff and /clear before executing the approved plan.
 Never blocks: any error exits 0 silently. Standard library only.
 """
 from __future__ import annotations
@@ -36,7 +38,23 @@ def last_context(path: Path) -> int | None:
     return None
 
 
-def main() -> int:
+def plan_approved() -> int:
+    print(json.dumps({
+        "systemMessage": "Kế hoạch đã duyệt: nên /clear trước khi thực hiện (tóm tắt ở HANDOFF.md).",
+        "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": (
+                "[ctx_guard] PO vừa duyệt kế hoạch. Trước khi thực hiện: ghi kế hoạch (hoặc đường dẫn file kế hoạch) và "
+                "bước tiếp vào HANDOFF.md trong thư mục quản lý (đọc file cũ trước khi ghi), rồi nhắc PO chạy /clear."
+            ),
+        },
+    }, ensure_ascii=False))
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    if (sys.argv[1:] if argv is None else argv) == ["plan-approved"]:
+        return plan_approved()
     try:
         THRESHOLD = int(os.environ.get("CTX_GUARD_THRESHOLD", DEFAULT_THRESHOLD))
         payload = json.load(sys.stdin)

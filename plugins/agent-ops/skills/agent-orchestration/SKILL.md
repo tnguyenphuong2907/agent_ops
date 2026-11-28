@@ -13,6 +13,8 @@ Nguồn luật: mục tiết kiệm token trong `CLAUDE.md` của dự án (tóm
 3. Một agent một việc, xong là thôi. Không chạy song song nhiều agent cùng đọc một bộ tài liệu lớn; giao mỗi agent đúng phần nó cần.
    - Mỗi lượt giao việc trong một task (dev → review → sửa → QA) brief kèm **ảnh chụp trạng thái** (kết quả agent trước, `#n` còn mở, mục cần đọc) theo skill `agent-ops:task-management` § Giao việc, để agent sau không đọc lại mục 3–5 để dựng lại.
    - Phiếu DR còn mở mà phương án có thể đổi response hoặc hành vi → chờ chốt rồi mới giao phần phụ thuộc; chỉ chạy song song phần chắc chắn không bị ảnh hưởng, và brief ghi rõ phần đó.
+   - **Dựng brief bằng tool:** `python3 "${CLAUDE_PLUGIN_ROOT}/tools/brief.py" <subtask> [--round N] [--plan]` in ảnh chụp trạng thái và bốn dòng bắt buộc; điền hết `<điền …>` rồi mới spawn (hook `brief_guard.py` chặn brief còn chỗ trống). Brief nhắc agent chạy `ctx_pack.py` / `task_section.py` thành lệnh riêng, không gộp lệnh khác (output bị cắt).
+   - **Việc phụ thuộc kết quả review chạy sau review**, không song song (vd đặc tả màn chỉ giao khi hợp đồng API đã duyệt). Chỉ song song phần chắc chắn không đổi theo kết quả review.
 
 ## Quy tắc 7: vòng phiếu DR
 Mỗi lượt agent của phiếu ghi `~NK` vào Lịch sử; tổng quá 200K token trên một phiếu thì báo PO ngay (một lần, chỉ báo), kèm bài toán gốc trong 3 câu. Chi tiết: skill `agent-ops:decision-requests` mục 7.
@@ -24,9 +26,10 @@ Mỗi lượt agent của phiếu ghi `~NK` vào Lịch sử; tổng quá 200K t
 |---|---|
 | `haiku` | Cơ học: tra cứu, tìm file, tóm tắt một file, cập nhật trạng thái task/BOARD, chạy script kiểm tra (`build_inbox.py --check`…) |
 | `sonnet` (mặc định) | PRD/user story, phản biện tính năng (idea-reviewer), kế hoạch/báo cáo ngày, code theo task (kể cả code đụng dữ liệu người dùng), test, UI, review code không đụng bảo mật, vòng 2 phản biện chỉ kiểm điểm cũ |
-| `opus` | Lập kế hoạch cho subtask `plan: opus`, kiến trúc/ADR, schema và migration, phiếu DR loại 1 (soạn và phản biện vòng 1), review code đụng auth/khoá/mã hoá/dữ liệu người dùng (nguyên tắc bảo mật khoá/bí mật của dự án), bug khó qua nhiều tầng, hoặc khi lần giao trước bằng model thấp hơn bị trả lại vì thiếu sâu |
+| `opus` | Lập kế hoạch cho subtask `plan: opus`, kiến trúc/ADR, schema và migration, phiếu DR loại 1 đã chỉ ra được quy tắc 1.x (soạn và phản biện vòng 1), review code đụng auth/khoá/mã hoá/dữ liệu người dùng (nguyên tắc bảo mật khoá/bí mật của dự án), bug khó qua nhiều tầng, hoặc khi lần giao trước bằng model thấp hơn bị trả lại vì thiếu sâu |
 
 - Chọn khác mặc định của agent thì ghi lý do một dòng trong brief. Kết quả kém vì model thấp → giao lại bằng model cao hơn, và ghi `/lesson` nếu lặp lại.
+- **Phiếu DR chưa rõ loại soạn và phản biện bằng `sonnet`.** Chạy `opus` thì brief ghi `quy tắc 1.x` đang áp dụng; hook `brief_guard.py` chặn nếu thiếu. Chữ hiển thị trên giao diện không phải phiếu DR đầy đủ (xem `decision-policy.md` của dự án).
 - **`effort`:** việc mức `haiku` truyền `effort: "low"` (model không hỗ trợ thì bỏ tham số); vòng 2 phản biện/review chỉ kiểm điểm cũ và QA kiểm lại một điểm truyền `effort: "medium"`; còn lại để mặc định. Kết quả kém vì `effort` thấp → giao lại không đặt `effort`.
 - **Việc vặt qua skill fork:** đóng task (`/close-task`), merge + dọn sau merge (`/merge-pr`) chạy trong skill `context: fork` + `model: haiku`: phiên chính chỉ nhận báo cáo ngắn. `/merge-pr` chỉ chạy khi PO gõ (là đồng ý merge). Logic ở `${CLAUDE_PLUGIN_ROOT}/tools/close_task.py`, `${CLAUDE_PLUGIN_ROOT}/tools/merge_pr.py`; PO gõ `ct [task-id]`, `mp [PR...]` thì hook `${CLAUDE_PLUGIN_ROOT}/hooks/scripts/task_shortcuts.py` chạy script không gọi model (0 token).
 - **Chia model theo bước:** scout `haiku` (gom ngữ cảnh, ghi context pack) → plan `opus` → thực thi `sonnet` → ghi chép cơ học `haiku`. Mỗi spawn tốn ~15–30K token khởi động: scout và ghi chép chỉ tách khi đáng; việc nhỏ giao một agent. `haiku` không viết PRD/ADR/DR/thiết kế.
@@ -35,13 +38,18 @@ Mỗi lượt agent của phiếu ghi `~NK` vào Lịch sử; tổng quá 200K t
 
 ## Quy tắc 9: đổi việc, HANDOFF và /clear
 Phiên chính không tự chạy được `/clear` (chỉ PO gõ). Khi:
+- PO **vừa duyệt kế hoạch** (hook `ctx_guard.py plan-approved` nhắc): ghi kế hoạch và bước tiếp vào HANDOFF rồi nhắc `/clear` trước khi thực hiện, hoặc
 - PO chuyển sang việc **không liên quan** việc đang làm (task/phiếu khác), hoặc
 - một task/phiếu vừa xong (`done`, `decided`), hoặc một PR vừa merge, hoặc
 - hook `${CLAUDE_PLUGIN_ROOT}/hooks/scripts/ctx_guard.py` (UserPromptSubmit) báo ngữ cảnh phiên chính > 150K token,
 
-thì xong việc đang làm, ghi `management/HANDOFF.md` (≤ 15 dòng: việc đang làm, mã task/phiếu, trạng thái, file đã sửa chưa commit, bước tiếp theo; ghi đè bản cũ, không commit), rồi nhắc PO một dòng: *"Nên chạy `/clear` trước khi sang việc mới; tóm tắt đã lưu ở `management/HANDOFF.md`."* (việc tiếp nhỏ, cùng chủ đề: gợi ý `/compact`). Chỉ nhắc, không dừng việc.
+thì xong việc đang làm, ghi `management/HANDOFF.md` (≤ 15 dòng: việc đang làm, mã task/phiếu, trạng thái, file đã sửa chưa commit, bước tiếp theo; **đọc bản cũ trước khi ghi**, giữ dòng bước tiếp và việc chưa xong, không commit; `close_task.py --handoff [--next "…"]` và `merge_pr.py` tự giữ các dòng đó), rồi nhắc PO một dòng: *"Nên chạy `/clear` trước khi sang việc mới; tóm tắt đã lưu ở `management/HANDOFF.md`."* (việc tiếp nhỏ, cùng chủ đề: gợi ý `/compact`). Chỉ nhắc, không dừng việc.
 
 **Model phiên chính:** gợi ý PO dùng `/model opusplan` (Opus trong plan mode, Sonnet khi thực thi): việc cần suy nghĩ (thiết kế, phiếu DR, bug nhiều tầng) vào plan mode; điều phối, merge, cập nhật trạng thái chạy Sonnet. Đây là lựa chọn của PO, luật chỉ gợi ý.
+
+## Làm việc trong phiên chính
+- **Không im lặng lâu:** trước một chuỗi tool dài (nhiều lượt đọc/sửa, test, chờ agent) nói một câu đang làm gì.
+- **Tạo nhánh từ `origin/<base>` luôn kèm `--no-track`** (hook `branch_guard.py` chặn nếu thiếu).
 
 ## Quy tắc 10: đầu phiên mới
 PO nói tiếp việc cũ → đọc `management/HANDOFF.md` trước, không đọc lại tài liệu để dựng lại ngữ cảnh.

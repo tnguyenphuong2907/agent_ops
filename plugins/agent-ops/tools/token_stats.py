@@ -42,6 +42,7 @@ GREP_RE = re.compile(r"(^|[|;&(]\s*)(grep|rg)\b")
 CLAUDE_MD_RE = re.compile(r"\b(cat|sed|head|tail|nl|less)\b[^|;&]*CLAUDE\.md")
 CHARS_PER_TOKEN = 4
 MAIN_CTX_LIMIT = 150_000
+BIG_OUTPUT_CHARS = 30_000  # above this a tool result is truncated or floods the context
 
 
 def tool_kind(name: str, inp: dict) -> str | None:
@@ -74,6 +75,22 @@ def result_chars(block: dict) -> int:
     return 0
 
 
+def result_text(block: dict) -> str:
+    content = block.get("content")
+    if isinstance(content, list):
+        return " ".join(c.get("text", "") for c in content if isinstance(c, dict))
+    return content if isinstance(content, str) else ""
+
+
+def call_label(name: str, inp: dict) -> str:
+    """Tool name plus the start of its command or file name."""
+    arg = str(inp.get("command") or inp.get("file_path") or inp.get("pattern") or "")
+    if inp.get("file_path"):
+        arg = Path(arg).name
+    arg = " ".join(arg.split()).replace("|", "\\|")
+    return f"{name} {arg[:80]}".strip()
+
+
 def default_transcripts() -> Path:
     return Path.home() / ".claude" / "projects" / re.sub(r"[^A-Za-z0-9]", "-", str(ROOT))
 
@@ -92,6 +109,10 @@ def parse_run(path: Path) -> dict | None:
     kinds: dict[str, str] = {}
     fill = {"task_md": 0, "grep": 0}
     claude_md_reads = 0
+    calls_made: dict[str, str] = {}
+    errors: list[tuple[str, str]] = []
+    big: list[tuple[str, int]] = []
+    seen_results: set[str] = set()
     started, brief = "", ""
     used_models: Counter = Counter()
     for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
@@ -119,6 +140,15 @@ def parse_run(path: Path) -> dict | None:
                         claude_md_reads += 1
                     elif kind:
                         kinds[block.get("id", "")] = kind
+                if block.get("type") == "tool_use":
+                    calls_made[block.get("id", "")] = call_label(block.get("name", ""), block.get("input") or {})
+                if block.get("type") == "tool_result" and block.get("tool_use_id") not in seen_results:
+                    seen_results.add(block.get("tool_use_id"))
+                    label = calls_made.get(block.get("tool_use_id"), "?")
+                    if block.get("is_error"):
+                        errors.append((label, result_text(block)[:120].replace("\n", " ")))
+                    if result_chars(block) > BIG_OUTPUT_CHARS:
+                        big.append((label, result_chars(block)))
                 if block.get("type") == "tool_result" and block.get("tool_use_id") in kinds:
                     fill[kinds.pop(block["tool_use_id"])] += result_chars(block) // CHARS_PER_TOKEN
                 if block.get("type") == "tool_use" and block.get("name") == "Read":
@@ -149,6 +179,8 @@ def parse_run(path: Path) -> dict | None:
         "task_md": fill["task_md"],
         "grep": fill["grep"],
         "claude_md_reads": claude_md_reads,
+        "errors": errors,
+        "big": big,
     }
 
 
@@ -220,7 +252,7 @@ def render_session(main_path: Path) -> str:
     runs += sorted((r for r in subs if r), key=lambda r: r["started"])
     if not runs:
         return "Phiên không có lần gọi model nào.\n"
-    cost = sum(map(weighted, runs))
+    cost = sum(map(weighted, runs)) or 1
     out = [f"# Token phiên {main_path.stem[:8]}", "",
            f"- Lượt agent: {len(runs) - bool(main_run)}; gọi model: {sum(r['calls'] for r in runs)}",
            f"- Thô: đọc cache {sum(r['cache_read'] for r in runs):,} · ghi cache {sum(r['cache_write'] for r in runs):,} "
@@ -236,6 +268,15 @@ def render_session(main_path: Path) -> str:
     for name, rs in sorted(models.items(), key=lambda kv: -sum(map(weighted, kv[1]))):
         part = sum(map(weighted, rs))
         out.append(f"| {name} | {sum(r['calls'] for r in rs)} | {part / 1e6:.2f}M | {part / cost:.0%} |")
+    out += ["", "| lượt | lỗi tool | output > 30K ký tự |", "|---|---|---|"]
+    noisy = [(i, r) for i, r in enumerate(runs) if r["errors"] or r["big"]]
+    out += [f"| {i}. {r['agent']} {r['desc']} | {len(r['errors'])} | {len(r['big'])} |" for i, r in noisy]
+    if not noisy:
+        out.append("| (không có) | 0 | 0 |")
+    for i, r in noisy:
+        out += ["", f"Lượt {i}:"]
+        out += [f"- lỗi: `{label}`: {why}" for label, why in r["errors"][:5]]
+        out += [f"- lớn: `{label}`: {n:,} ký tự" for label, n in sorted(r["big"], key=lambda x: -x[1])[:5]]
     return "\n".join(out) + "\n"
 
 

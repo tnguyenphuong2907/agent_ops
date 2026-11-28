@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.5.0
+
+- Tools: `brief.py` (brief skeleton), `task_section.py`, `prepare_close.py` (reviewed subtasks to `done`), `dr_apply.py` (record a provisional decision).
+- `close_task.py --pr --handoff --next`; `ct` accepts `--pr` and `--handoff`. `merge_pr.py` and `close_task.py` keep the open next steps of HANDOFF.md.
+- `ctx_pack.py`: parts limited to 28,000 bytes (was 28,000 characters), signatures of code files, headings of `contract.md`. New template `contract.md`.
+- `token_stats.py --session`: tool errors and outputs above 30K characters per run.
+- Hooks: `branch_guard.py` (new branch from `origin/<base>` needs `--no-track`); `brief_guard.py` denies opus decision-request runs without `quy tắc 1.x` and unfilled `<điền …>`; `ctx_guard.py` reminds to /clear after a plan is approved.
+- `check_task.py` no longer stops on an unknown `[merge]` key (a stale cached plugin met a newer `local_stamp_dir`); scans `contract.md`.
+- Rules: UI wording decided by the product analyst without a decision request; contract review before screen spec; minor findings fixed in one pass; prototypes updated only when the PO reviews them.
+- **Action needed:** add tool shims for `brief.py`, `task_section.py`, `prepare_close.py`, `dr_apply.py`; copy the template and policy changes into the project.
+
 ## 0.4.0
 
 - Plan step: subtask frontmatter `plan: opus` and section `## Kế hoạch`; `/run-task` runs an opus planning pass, then sonnet codes. `check_task.py` and `task_step.py` stop on a missing plan.
