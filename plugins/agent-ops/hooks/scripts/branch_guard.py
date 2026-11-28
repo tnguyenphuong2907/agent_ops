@@ -18,7 +18,7 @@ CREATE = {"switch": {"-c", "-C", "--create", "--force-create"}, "checkout": {"-b
 GIT_VALUE_OPTS = {"-C", "-c", "--git-dir", "--work-tree"}
 
 
-HEREDOC = re.compile(r"<<-?[ \t]*(['\"]?)(\w+)\1")
+HEREDOC = re.compile(r"<<-?[ \t]*(['\"]?)([A-Za-z_]\w*)\1")
 
 
 def segments(command: str) -> list[list[str]]:

@@ -13,7 +13,8 @@ class BranchGuard(unittest.TestCase):
                     "git fetch && git switch -c feat/x origin/main && ls", "git -C repo branch feat/x origin/main",
                     "git worktree add -b feat/x ../w origin/main", "git fetch\ngit switch --create feat/x origin/main",
                     "# note\ngit switch -c x origin/main", "cat <<EOF\nit's here\nEOF\ngit switch -c x origin/main",
-                    "git switch --create=x origin/main", "git switch -cx origin/main", "ls # it's\ngit switch -c x origin/main"):
+                    "git switch --create=x origin/main", "git switch -cx origin/main",
+                    "echo $((1<<2))\ngit switch -c x origin/main", "ls # it's\ngit switch -c x origin/main"):
             self.assertTrue(hit(cmd), cmd)
 
     def test_allowed(self):

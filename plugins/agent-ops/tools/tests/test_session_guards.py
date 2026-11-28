@@ -70,6 +70,10 @@ class HandoffReview(unittest.TestCase):
         self.assertNotIn("merge #300", text)
         self.assertIn("mp 301", text)
 
+    def test_hand_written_note_kept_after_merge(self):
+        note = "- E09-T02 chờ merge #300; sau đó PM chia E09-T03"
+        self.assertIn(note, handoff.compose(note, "merge_pr.py", ["- #300 a: merged"], {300}))
+
     def test_next_step_heading_kept(self):
         text = handoff.compose("## Bước tiếp\nlàm X\n", "merge_pr.py", ["- #1 a: merged"], {1})
         self.assertIn("- Bước tiếp\nlàm X", text)

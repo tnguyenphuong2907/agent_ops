@@ -30,10 +30,12 @@ SUBTASK = re.compile(r"\bE\d\d-T\d\d-S\d\d\b")
 PLAN_RUN = re.compile(r"(?im)^\W*Chế độ:\W*lập kế hoạch")
 DR_ROLES = {"architect", "decision-reviewer"}
 _VERB = r"(?:soạn|viết|phản biện|draft|review)"
-_DR = r"(?:phiếu\b(?:\s+DR(?:-\d{3})?)?|DR(?:-\d{3})?\b)"
-# The verb's object must be the request itself, not a design that merely cites one.
-DR_WORK = re.compile(rf"(?i)\b{_VERB}\s+(?:(?:đề xuất|mục\s+[\d ,–-]+(?:và\s+\d+)?)\s*(?:(?:cho|của)\s+)?)?{_DR}"
-                     rf"|\bDR-\d{{3}}\s*[:,–-]?\s*{_VERB}\b")
+_DR = r"(?:phiếu\b(?:[ \t]+[`*\"]*DR(?:-\d{3})?)?|DR(?:-\d{3})?\b)"
+# Words that may stand between the verb and its object; any other word means the object is not the request.
+_FILL = r"(?:lại|vòng[ \t]*\d+|đề xuất|mục[ \t]+\d[\d ,–-]*(?:và[ \t]*\d+)?|cho|của)"
+# The verb's object must be the request itself, not a design that merely cites one. One line only.
+DR_WORK = re.compile(rf"(?im)\b{_VERB}(?:[ \t]+{_FILL})*[ \t]*:?[ \t]*[`*\"]*{_DR}"
+                     rf"|^\W*(?:phiếu[ \t]+)?DR-\d{{3}}[`*]*[ \t]*:[ \t]*{_VERB}\b")
 TYPE1_RULE = re.compile(r"(?i)\b(quy tắc|nhóm|rule)\W{0,4}1\.(1[0-2]|[1-9])\b")
 PLACEHOLDER = re.compile(r"<điền[^>\n]*>")
 OPUS_REASON = re.compile(r"(?im)^\W*Lý do opus:[ \t*]*\S")

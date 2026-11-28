@@ -16,7 +16,8 @@ PR_ROW = re.compile(r"^- #(\d+) [\w./-]+: (.*)$")
 STATE = re.compile(r"^- Trạng thái [\w./-]+: [0-9a-f]{7,}")
 DONE = re.compile(r"^[-*] (\[[xX]\]|~~|✅)")
 NEXT = re.compile(r"(?i)bước tiếp|việc tiếp")
-WAITING = re.compile(r"(?i)chờ (?:PO: mp|merge) #?(\d+)")
+# Only whole lines in the forms close_task.py writes; a hand-written note that mentions a PR is kept.
+WAITING = re.compile(r"^- (?:Đã đóng [^\n]*; chờ PO: mp|Bước tiếp: chờ merge) #?(\d+)\.?$")
 
 
 def bullets(text: str) -> list[str]:
@@ -44,7 +45,7 @@ def carried(old: str, prs: set[int], merged: set[int] = frozenset()) -> list[str
         row = PR_ROW.match(block)
         if row and (int(row.group(1)) in prs or row.group(2).startswith("merge")):
             continue
-        waiting = WAITING.search(block)
+        waiting = WAITING.match(block)
         if waiting and int(waiting.group(1)) in merged:
             continue
         if STATE.match(block) or block == DEFAULT_NEXT or DONE.match(block):
