@@ -12,9 +12,11 @@ updated: YYYY-MM-DD
 <1 câu>
 
 ## Nguồn cần đọc
-| File | Dòng/mục | Vì sao |
-|---|---|---|
-| | | |
+Đặt tên tắt (nếu cần) ở đây: `T1` = `<đường dẫn từ gốc repo>`. Cột "Dòng/mục" ghi dải số (`89–130`) để `ctx_pack.py <subtask>` in được đúng đoạn; cột "Ai" ghi mã subtask (`S02`, `S01–S03`) hoặc `mọi vai`.
+
+| File | Dòng/mục | Vì sao | Ai |
+|---|---|---|---|
+| | | | |
 
 ## Quyết định liên quan
 - D-xxx: <1 câu>

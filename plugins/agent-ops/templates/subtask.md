@@ -7,7 +7,8 @@ layer:                    # be | fe | e2e | doc
 assignee:
 estimate_hours:           # ≤ 6
 actual_hours:
-selfcheck:                # api | ui | trống (subtask thiết kế; mẫu design-selfcheck.md)
+selfcheck:                # CHỈ subtask thiết kế: api | ui (mẫu design-selfcheck.md); subtask code để trống
+plan:                     # opus | trống (subtask khó: opus lập kế hoạch trước khi code)
 commit:
 ---
 
@@ -19,8 +20,11 @@ commit:
 ## Điều kiện xong  ·  _pm_
 - [ ]
 
+## Kế hoạch  ·  _người lập kế hoạch (opus)_
+> Chỉ khi frontmatter có `plan: opus`: viết **trước khi code**, ≤ 60 dòng, không viết code: file cần tạo/sửa và việc ở mỗi file, thứ tự làm, ca biên + cách xử lý, test cần có, đoạn nguồn người code cần mở (đường dẫn + dòng). Còn trống thì `task_step.py` và hook chặn.
+
 ## Tiến trình  ·  _dev_
-> Ghi giờ: chạy `date` lúc bắt đầu và lúc kết thúc, ghi cả hai vào đây rồi tính `actual_hours`.
+> Bắt đầu/kết thúc bằng `task_step.py <subtask> start|done [--commit <sha>] [--note "..."]`: tool lấy giờ, đổi trạng thái, ghi Lịch sử và tính `actual_hours`.
 > Subtask đồng bộ/chuyển quy tắc: ghi lệnh `grep` theo ID quy tắc chạy sau khi sửa, số kết quả và danh sách file (không chép từng dòng). Chỉ subtask sửa cuối của task ghi kết quả quét cuối cùng; sửa thêm thì quét lại. Không ghi hash commit.
 > Subtask sửa tool kiểm tra (`tools/`): kèm bảng ca phản ví dụ dưới đây và 1 test mỗi ca trước khi gửi review.
 >

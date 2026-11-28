@@ -1,7 +1,8 @@
 """Mechanical checks on a task before review or close, without a model.
 
 Usage: python3 "${CLAUDE_PLUGIN_ROOT}/tools/check_task.py" TASK-ID [--stage review|close] [--base REF]
-  review: design self-check tables (templates/design-selfcheck.md) of subtasks with `selfcheck:` are filled.
+  review: design self-check tables (templates/design-selfcheck.md) of subtasks with `selfcheck:` are filled,
+          and subtasks with `plan: opus` have their "## Kế hoạch" section.
   close (default): also every review finding has "Đã sửa?" filled and the result lines are there.
 Errors exit 1. Warnings (stale AC ranges, leftover "waiting for" wording) only print.
 Broken anchors are covered by build_inbox --check. Standard library only.
@@ -53,6 +54,20 @@ def selfcheck_errors(name: str, text: str) -> list[str]:
         elif re.fullmatch(r"(?i)không áp dụng(\s+vì)?[\s.:…—-]*", answers[key]):
             errors.append(f"{name}: Tự kiểm {key} ghi không áp dụng nhưng thiếu lý do")
     return errors
+
+
+def plan_errors(name: str, text: str) -> list[str]:
+    """A subtask marked `plan: opus` needs a written plan before anyone codes it."""
+    kind = ct.frontmatter(text).get("plan", "")
+    if not kind:
+        return []
+    if kind != "opus":
+        return [f"{name}: `plan` lạ: {kind} (dùng opus hoặc để trống)"]
+    m = re.search(r"(?ms)^## Kế hoạch[^\n]*\n(.*?)(?=^## |\Z)", ct.COMMENT.sub("", text))
+    body = [l.strip() for l in (m.group(1) if m else "").splitlines() if not l.lstrip().startswith(">")]
+    if all(l in BLANK for l in body):
+        return [f"{name}: `plan: opus` nhưng mục Kế hoạch còn trống"]
+    return []
 
 
 def unclosed_findings(review: str) -> list[str]:
@@ -117,7 +132,8 @@ def gate_errors(tdir: Path, tid: str, stage: str) -> list[str]:
     """Self-check tables, plus review findings at close. close_task.py runs this before closing."""
     errors = []
     for sub in sorted(tdir.glob(f"{tid}-S*.md")):
-        errors += selfcheck_errors(sub.name, sub.read_text(encoding="utf-8"))
+        text = sub.read_text(encoding="utf-8")
+        errors += selfcheck_errors(sub.name, text) + plan_errors(sub.name, text)
     if stage == "close":
         errors += unclosed_findings(ct.section((tdir / "task.md").read_text(encoding="utf-8"), 4))
     return errors

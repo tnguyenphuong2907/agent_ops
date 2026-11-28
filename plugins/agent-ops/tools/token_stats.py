@@ -5,6 +5,9 @@ Usage:
     python3 "${CLAUDE_PLUGIN_ROOT}/tools/token_stats.py" --since 2026-11-20  # only runs started on/after date
     python3 "${CLAUDE_PLUGIN_ROOT}/tools/token_stats.py" --by task           # group by task ID (E01-T02) found in the brief
     python3 "${CLAUDE_PLUGIN_ROOT}/tools/token_stats.py" --transcripts DIR   # another transcripts dir (default: this repo's)
+    python3 "${CLAUDE_PLUGIN_ROOT}/tools/token_stats.py" --session last
+        # one main session (ID prefix, or `last` = newest with subagents): run by run and per model,
+        # in weighted tokens (base input units, 1 hour cache write x2; not money)
 
 Reads `<transcripts>/<session>/subagents/agent-*.jsonl` (+ `.meta.json` for agent type and model).
 One API response can span several transcript lines, so usage is counted once per message id.
@@ -30,6 +33,7 @@ from _project import project_root  # noqa: E402
 
 ROOT = project_root()
 WEIGHTS = {"cache_read": 0.1, "cache_write": 1.25, "output": 5.0}
+WRITE_1H_EXTRA = 0.75  # a 1 hour cache write costs x2, i.e. 0.75 more than the 5 minute one
 TASK_RE = re.compile(r"\bE\d{2}-T\d{2}\b")
 DR_RE = re.compile(r"\bDR-\d{3}\b")
 TASK_READ_RE = re.compile(r"\b(cat|sed|head|tail|nl|awk|less|git show)\b[^|;&>]*task\.md")  # stops at ">": writes are not reads
@@ -89,6 +93,7 @@ def parse_run(path: Path) -> dict | None:
     fill = {"task_md": 0, "grep": 0}
     claude_md_reads = 0
     started, brief = "", ""
+    used_models: Counter = Counter()
     for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
         try:
             rec = json.loads(line)
@@ -101,6 +106,8 @@ def parse_run(path: Path) -> dict | None:
         if not brief and rec.get("type") == "user" and isinstance(content, str):
             brief = content
         if rec.get("type") == "assistant" and msg.get("id") and msg.get("usage"):
+            if msg["id"] not in usage and msg.get("model"):
+                used_models[msg["model"]] += 1
             usage[msg["id"]] = msg["usage"]
         if isinstance(content, list):
             for block in content:
@@ -126,8 +133,11 @@ def parse_run(path: Path) -> dict | None:
     return {
         "agent": meta.get("agentType") or "?",
         "model": meta.get("model") or "default",
+        "used_model": used_models.most_common(1)[0][0] if used_models else meta.get("model") or "?",
+        "desc": meta.get("description") or "",
         "task": tag.group(0) if tag else "?",
         "date": started[:10],
+        "started": started,
         "calls": len(usage),
         "first": ctx[0],
         "last": ctx[-1],
@@ -190,7 +200,43 @@ def render_main(transcripts: Path, since: str | None) -> str:
 
 
 def weighted(run: dict) -> float:
-    return sum(run[k] * w for k, w in WEIGHTS.items())
+    return sum(run[k] * w for k, w in WEIGHTS.items()) + run.get("write_1h", 0) * WRITE_1H_EXTRA
+
+
+def find_session(transcripts: Path, wanted: str) -> Path | None:
+    """Main transcript whose ID starts with `wanted`; `last` = newest one that ran subagents."""
+    paths = list(transcripts.glob("*.jsonl"))
+    if wanted == "last":
+        paths = [p for p in paths if any((p.with_suffix("") / "subagents").glob("*.jsonl"))]
+        return max(paths, key=lambda p: p.stat().st_mtime, default=None)
+    hits = [p for p in paths if p.stem.startswith(wanted)]
+    return hits[0] if len(hits) == 1 else None
+
+
+def render_session(main_path: Path) -> str:
+    main_run = parse_run(main_path)
+    runs = [main_run | {"agent": "phiên chính", "desc": ""}] if main_run else []
+    subs = [parse_run(p) for p in sorted((main_path.with_suffix("") / "subagents").glob("*.jsonl"))]
+    runs += sorted((r for r in subs if r), key=lambda r: r["started"])
+    if not runs:
+        return "Phiên không có lần gọi model nào.\n"
+    cost = sum(map(weighted, runs))
+    out = [f"# Token phiên {main_path.stem[:8]}", "",
+           f"- Lượt agent: {len(runs) - bool(main_run)}; gọi model: {sum(r['calls'] for r in runs)}",
+           f"- Thô: đọc cache {sum(r['cache_read'] for r in runs):,} · ghi cache {sum(r['cache_write'] for r in runs):,} "
+           f"· đầu ra {sum(r['output'] for r in runs):,}",
+           f"- Quy đổi (đơn vị input, chưa nhân giá model): {cost / 1e6:.2f}M", "",
+           "| lượt | việc | model | gọi | ngữ cảnh cuối | quy đổi | % |", "|---|---|---|---|---|---|---|"]
+    out += [f"| {r['agent']} | {r['desc']} | {r['used_model']} | {r['calls']} | {r['last']:,} | "
+            f"{weighted(r) / 1e6:.2f}M | {weighted(r) / cost:.0%} |" for r in runs]
+    out += ["", "| model | gọi | quy đổi | % |", "|---|---|---|---|"]
+    models: dict[str, list[dict]] = defaultdict(list)
+    for r in runs:
+        models[r["used_model"]].append(r)
+    for name, rs in sorted(models.items(), key=lambda kv: -sum(map(weighted, kv[1]))):
+        part = sum(map(weighted, rs))
+        out.append(f"| {name} | {sum(r['calls'] for r in rs)} | {part / 1e6:.2f}M | {part / cost:.0%} |")
+    return "\n".join(out) + "\n"
 
 
 def render(runs: list[dict], by: str) -> str:
@@ -237,6 +283,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--since", help="only runs started on/after YYYY-MM-DD")
     ap.add_argument("--by", choices=("agent", "task"), default="agent")
     ap.add_argument("--transcripts", type=Path, default=None, help="transcripts dir (default: this repo's)")
+    ap.add_argument("--session", help="one session: ID prefix or `last`")
     args = ap.parse_args(argv)
     if args.since and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", args.since):
         ap.error("--since must be YYYY-MM-DD")
@@ -244,6 +291,13 @@ def main(argv: list[str] | None = None) -> int:
     if not transcripts.is_dir():
         print(f"Không thấy thư mục transcript: {transcripts}", file=sys.stderr)
         return 1
+    if args.session:
+        path = find_session(transcripts, args.session)
+        if not path:
+            print(f"Không tìm được đúng một phiên cho `{args.session}`", file=sys.stderr)
+            return 1
+        sys.stdout.write(render_session(path))
+        return 0
     sys.stdout.write(render(collect(transcripts, args.since), args.by))
     sys.stdout.write(render_main(transcripts, args.since))
     return 0

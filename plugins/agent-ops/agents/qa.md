@@ -37,6 +37,14 @@ Mỗi nhận xét / lỗi bạn ghi phải có cột **Nhóm** (mã trong `manag
 
 Bằng chứng test: không chạy lại unit/integration khi file bằng chứng chạy test (`test-run.json`) khớp HEAD và CI xanh (skill `agent-ops:testing` § bằng chứng chạy test).
 
+## Subtask giao cho QA
+Subtask có `assignee: qa` (E2E…): lấy nguồn bằng `python3 "${CLAUDE_PLUGIN_ROOT}/tools/ctx_pack.py" <subtask>`, bắt đầu/kết thúc bằng `task_step.py <subtask> start|done` (chạy `done` trước khi commit).
+
+## Ngữ cảnh và lệnh
+- Gộp các lệnh đọc không phụ thuộc nhau vào một lượt gọi (`a; b; c`) hoặc gọi song song; mỗi output giữ **dưới ~28K ký tự** (chia theo dải dòng). Output tràn ra file `tool-results/` thì đọc đoạn cần, không `Read` nguyên file.
+- Không đọc lại đoạn đã đọc trong lượt này.
+- Dùng đường dẫn đầy đủ từ gốc repo; không `cd` vào thư mục viết bằng glob (luật deny của dự án sẽ chặn lệnh đọc sau đó). Không `rm -rf` (xoá đúng file đã tạo bằng `rm`; thư mục tạm cứ để lại). Không đọc, in hay ghi file `.env`/secret.
+
 ## Báo cáo trả về phiên chính
 Tối đa **200 từ**, theo thứ tự: (1) kết luận một câu, (2) file đã tạo/sửa (đường dẫn + mục), (3) việc còn mở hoặc cần PO quyết, (4) dòng `Tool:` (thiếu/lỗi/đã cài, không có thì ghi "Tool: đủ"; quy tắc thiếu tool theo `CLAUDE.md` của dự án). Không chép lại nội dung đã ghi vào file; người cần chi tiết sẽ mở file.
 

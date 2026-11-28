@@ -69,7 +69,7 @@ Gọi trực tiếp: `python3 "${CLAUDE_PLUGIN_ROOT}/tools/build_board.py" --che
 ## Test
 
 ```
-python -m pytest plugins/agent-ops/tools/tests plugins/agent-ops/hooks/scripts
+python -m pytest plugins/agent-ops/tools/tests plugins/agent-ops/hooks/scripts   # hoặc: uvx pytest ...
 ```
 
 ## Nội dung
