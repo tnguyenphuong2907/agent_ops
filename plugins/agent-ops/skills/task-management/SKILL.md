@@ -14,6 +14,9 @@ Luật đầy đủ: `management/README.md`. Tóm tắt thao tác:
 3. Subtask: file `E<nn>-T<nn>-S<nn>-<slug>.md` cạnh `task.md` (copy `templates/subtask.md`) — hoặc chỉ là một dòng trong bảng Subtasks nếu thật sự nhỏ (≤ 30 phút).
 4. Task luồng: gán `flow: F<nn>` ở frontmatter và thêm/cập nhật dòng của luồng trong `management/flows.md`; slice của epic khác nằm trong task luồng tiêu thụ nó đầu tiên.
 5. Thêm dòng vào bảng task của `epic.md` rồi chạy `python3 "${CLAUDE_PLUGIN_ROOT}/tools/build_board.py"` (BOARD sinh tự động, không sửa tay; xem đầu file BOARD). Luật nhánh: mục Quy ước Git trong `CLAUDE.md` của dự án.
+6. AC **dẫn mã nguồn** (D-xxx, mã yêu cầu, mục tài liệu), không diễn giải lại luật: câu diễn giải dễ lệch nguồn.
+7. Subtask thiết kế hợp đồng API đặt `selfcheck: api`, đặc tả màn đặt `selfcheck: ui`; "Điều kiện xong" ghi "bảng Tự kiểm đã điền đủ" (mẫu `${CLAUDE_PLUGIN_ROOT}/templates/design-selfcheck.md`).
+8. Chạy `python3 "${CLAUDE_PLUGIN_ROOT}/tools/check_task.py" <task> --stage review` trước khi giao review, và bỏ `--stage` trước khi đóng task; sửa hết dòng `lỗi:`, đọc từng dòng `cảnh báo:`.
 
 ## Chia nhỏ — câu hỏi kiểm tra
 - Task lớn làm xong trong **1 ngày**? Nếu không → tách. Task luồng: ≤ 3 ngày, ≤ 6 subtask? Màn chạy được với BE thật ở cuối task?
@@ -40,7 +43,7 @@ Không viết câu hỏi trực tiếp trong task. Tạo **phiếu DR** theo ski
 - Mỗi phát hiện có **số** (`#n`), mức (Blocker/Major/Minor) và **trạng thái**: `mở` / `đã sửa` / `không sửa — lý do` / `để PO quyết`.
 - Lý do quan trọng (vì sao bỏ một hướng, vì sao chấp nhận rủi ro) viết ra file, không chỉ để trong báo cáo trả về.
 
-**Phiên chính viết brief cho agent sau** (mọi lượt giao trong task: dev → review → sửa → QA), ≤ 12 dòng:
+**Phiên chính viết brief cho agent sau** (mọi lượt giao trong task: làm → review → sửa → QA), ≤ 16 dòng:
 1. Vòng thứ mấy, việc cần làm, và chỉ đọc mục nào (ví dụ "vòng 2: đọc mục 4 vòng 1, sửa #3, #5, #7").
 2. Các phát hiện **đã chốt, không mở lại** (theo số).
 3. Điểm **còn bất đồng**: giữ nguyên trong file, để PO quyết, không tranh luận lại.
@@ -52,5 +55,9 @@ Không viết câu hỏi trực tiếp trong task. Tạo **phiếu DR** theo ski
    Còn mở: #3, #5 (mục 4 vòng 1); lỗi QA: —
    Đọc: task.md mục 1 (AC2, AC3), 2 (phần API) — theo README mục 7 quy tắc 13
    ```
+6. **Quyết định đang treo:** DR còn mở hoặc vừa chốt, và phần nào phải làm lại theo nó.
+7. **Reviewer sẽ kiểm:** bảng tự kiểm áp dụng và điểm riêng của lượt này. Brief **người làm** ghi cùng danh sách đó, không để chỉ người rà biết.
+8. **Đầu ra bắt buộc:** ví dụ bảng Tự kiểm đã điền, kết quả `check_task.py`.
+9. **Đóng việc:** ai đánh dấu cột "Đã sửa?" và ai ghi dòng `**Kết quả:**`, theo quyền theo mục của dự án; gộp các điểm còn lại vào một lượt.
 
 Người rà soát vòng sau vẫn được nêu phát hiện mới, nhưng ghi rõ "mới ở vòng n".

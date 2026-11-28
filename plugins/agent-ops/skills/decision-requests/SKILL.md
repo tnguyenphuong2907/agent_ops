@@ -76,6 +76,8 @@ Theo agent `decision-reviewer`: phép thử "PO có chọn khác đi không?", t
 ## 4. Sau mỗi thay đổi phiếu
 Agent vừa sửa phiếu chạy `python3 "${CLAUDE_PLUGIN_ROOT}/tools/build_inbox.py"` để cập nhật inbox. Báo cáo ngày dẫn tới inbox thay vì chép lại nội dung phiếu.
 
+**Rà chữ cũ sau mỗi D-xxx** (kể cả tạm): người áp quyết định vào tài liệu `grep` câu/tên cũ, sửa hết, ghi lệnh và số kết quả còn lại vào file subtask hoặc task.
+
 ## 5. `/explain DR-xxx <câu hỏi>`
 - Người trả lời: architect (mặc định) hoặc agent chuyên môn phù hợp.
 - Ghi vào **mục 9** dạng `### H<n> (ngày): <câu hỏi>` + `**Trả lời (<agent>):** …`, kèm tham chiếu như mục 5.

@@ -71,6 +71,7 @@ Mục tiêu: khi có sự cố, tìm ra nguyên nhân **chỉ bằng log/metric*
 - [ ] `grep` repo trước khi nhắc component/thư viện/hàm có sẵn; thiết kế dừng ở hành vi và hợp đồng, không xuống tên file/hàm nội bộ (tên endpoint, schema, mã lỗi vẫn thuộc hợp đồng).
 - [ ] Mỗi hợp đồng có ca biên: `null`/rỗng, PATCH không đổi gì (theo `docs/05-api/conventions.md`), trường lạ, timeout khoá, lỗi mạng/5xx.
 - [ ] Đã tự kiểm danh sách của skill dự án (nếu có).
+- [ ] Hợp đồng API trong task: điền đủ bảng `api` (H1–H7) của `${CLAUDE_PLUGIN_ROOT}/templates/design-selfcheck.md` vào file subtask; người rà đối chiếu từng câu trả lời.
 
 ## 7. Tài nguyên trong skill
 - `scripts/check_arch_docs.py`: chạy ở gốc dự án `python3 "${CLAUDE_PLUGIN_ROOT}/skills/architecture-design/scripts/check_arch_docs.py"`. Kiểm mũi tên Mermaid có nhãn (flowchart, sequenceDiagram) trong `docs/02-architecture/`, và ADR đúng mẫu (tên file, số thứ tự, heading bắt buộc, trạng thái, `superseded by` trỏ ADR có thật). Exit 1 nếu có lỗi; `--warn-only` để chỉ báo. Chạy trước khi giao mọi thay đổi trong `docs/02-architecture/`.

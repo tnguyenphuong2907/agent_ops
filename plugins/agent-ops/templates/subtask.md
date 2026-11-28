@@ -7,6 +7,7 @@ layer:                    # be | fe | e2e | doc
 assignee:
 estimate_hours:           # ≤ 6
 actual_hours:
+selfcheck:                # api | ui | trống (subtask thiết kế; mẫu design-selfcheck.md)
 commit:
 ---
 
@@ -31,6 +32,9 @@ commit:
 > | Giá trị sai | | |
 > | Ngưỡng ngày | | |
 -
+
+## Tự kiểm  ·  _người làm_
+> Chỉ khi frontmatter có `selfcheck:`: chép bảng tương ứng từ mẫu `design-selfcheck.md` của plugin vào đây và trả lời từng dòng. Còn ô trống thì chưa chuyển review (`check_task.py <task> --stage review`).
 
 ## Kết quả kiểm tra  ·  _reviewer / qa_
 -

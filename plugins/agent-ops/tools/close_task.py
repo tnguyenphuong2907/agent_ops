@@ -192,6 +192,8 @@ def main(argv: list[str]) -> int:
     drs = open_drs(section(text, 6))
     if drs:
         fails.append("mục 6 còn phiếu open: " + ", ".join(drs))
+    import check_task  # late import: check_task builds on the helpers of this module
+    fails += check_task.gate_errors(tdir, tid, "close")
     if fails:
         print(f"Không đóng {tid} (chưa sửa gì):")
         print("\n".join(f"- {f}" for f in fails))

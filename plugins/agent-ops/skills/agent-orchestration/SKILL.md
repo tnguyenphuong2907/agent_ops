@@ -12,6 +12,7 @@ Nguồn luật: mục tiết kiệm token trong `CLAUDE.md` của dự án (tóm
 2. Chỉ `SendMessage` khi agent vừa trả lời trong vòng 5 phút **và** việc tiếp là phần nhỏ của cùng việc (hỏi lại một điểm, sửa một chỗ).
 3. Một agent một việc, xong là thôi. Không chạy song song nhiều agent cùng đọc một bộ tài liệu lớn; giao mỗi agent đúng phần nó cần.
    - Mỗi lượt giao việc trong một task (dev → review → sửa → QA) brief kèm **ảnh chụp trạng thái** (kết quả agent trước, `#n` còn mở, mục cần đọc) theo skill `agent-ops:task-management` § Giao việc, để agent sau không đọc lại mục 3–5 để dựng lại.
+   - Phiếu DR còn mở mà phương án có thể đổi response hoặc hành vi → chờ chốt rồi mới giao phần phụ thuộc; chỉ chạy song song phần chắc chắn không bị ảnh hưởng, và brief ghi rõ phần đó.
 
 ## Quy tắc 7: vòng phiếu DR
 Mỗi lượt agent của phiếu ghi `~NK` vào Lịch sử; tổng quá 200K token trên một phiếu thì báo PO ngay (một lần, chỉ báo), kèm bài toán gốc trong 3 câu. Chi tiết: skill `agent-ops:decision-requests` mục 7.
