@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0
+
+- Design self-check: `templates/design-selfcheck.md` (API H1–H7, UI M1–M6), subtask frontmatter `selfcheck:` and section `## Tự kiểm`.
+- `tools/check_task.py`: self-check tables, unclosed review findings, stale AC ranges, leftover waiting wording. `close_task.py` now stops on the first two. **Action needed:** a project with tool shims adds one for `check_task.py`; an open task with an empty "Đã sửa?" cell must fill it before `ct`.
+- Rules: AC cite source IDs, briefs carry review criteria and closing owner (limit 16 lines), hold dependent work while a DR is open, grep old wording after each decision.
+
 ## 0.2.0
 
 - `tools/init_project.py` + `/agent-ops:init`: scaffold a new project (config, project profile, process rules, decision policy, lessons, decision log) from `templates/project/`. Never overwrites.

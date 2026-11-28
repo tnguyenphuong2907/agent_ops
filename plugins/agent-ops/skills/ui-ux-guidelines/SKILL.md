@@ -32,6 +32,7 @@ Mẫu UX đặc thù của sản phẩm (nội dung, microcopy, luồng học/d�
 5. Tự kiểm bằng checklist D trước khi giao.
 
 ## D. Checklist (designer tự kiểm trước khi giao; frontend-dev tự kiểm trước `in_review`; code-reviewer/qa dùng khi rà)
+- [ ] (designer, subtask đặc tả màn) Điền đủ bảng `ui` (M1–M6) của `${CLAUDE_PLUGIN_ROOT}/templates/design-selfcheck.md` vào file subtask; người rà đối chiếu từng câu trả lời.
 - [ ] Đủ 6 trạng thái (A.4), có microcopy cho từng trạng thái.
 - [ ] Chỉ dùng token/component trong `design-system.md`; không hard-code màu, cỡ chữ, spacing (frontend: không dùng giá trị Tailwind tuỳ ý kiểu `text-[13px]`, `#hex`).
 - [ ] Tương phản (`scripts/check_contrast.py` đạt), vùng chạm 44px, focus rõ, dùng được bằng bàn phím.
