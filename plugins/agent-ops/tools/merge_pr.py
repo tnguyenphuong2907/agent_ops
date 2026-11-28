@@ -10,6 +10,8 @@ branch; conflicts only in generated files (BOARD, INBOX) are resolved by regener
 run of the exact head SHA is completed and green, and every name in
 `[merge] required_checks` is present. The list is read from `.agent-ops.toml` on origin/<base>; the run stops
 when that file is unreadable or does not declare the key (write `required_checks = []` to require none).
+With `[merge] local_stamp_dir` set (project without CI), check runs are not read; the gate is a stamp file
+named after the head SHA in that directory of the git common dir, written by the project's local check script.
 Standard library only; shells out to git and gh.
 """
 from __future__ import annotations
@@ -24,7 +26,7 @@ from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _project import CONFIG_NAME, ConfigError, merge_settings, mgmt_rel, parse_merge_settings, project_root  # noqa: E402
+from _project import CONFIG_NAME, ConfigError, merge_settings, mgmt_rel, parse_local_stamp_dir, parse_merge_settings, project_root  # noqa: E402
 
 REPO = project_root()
 os.environ.setdefault("AGENT_OPS_PROJECT_DIR", str(REPO))  # child tools find the project
@@ -125,6 +127,13 @@ def wait_ci(sha: str, required: list[str]) -> None:
         time.sleep(CI_STABLE_WAIT if done else 30)
 
 
+def check_stamp(stamp_dir: str, sha: str) -> None:
+    common = REPO / out("git", "rev-parse", "--git-common-dir")
+    if not (common / stamp_dir / sha).is_file():
+        raise Skip(f"chưa có kết quả kiểm local cho {sha[:8]}: checkout nhánh ở đúng commit này, "
+                   "chạy script kiểm local của dự án rồi chạy lại mp")
+
+
 def check_tasks(branch: str) -> None:
     ref = f"origin/{branch}"
     paths = out("git", "ls-tree", "-r", "--name-only", ref, f"{MGMT}/tasks").splitlines()
@@ -177,7 +186,7 @@ def pr_view(n: int) -> dict:
     return pr
 
 
-def merge_open(pr: dict, base: str, required: list[str]) -> str:
+def merge_open(pr: dict, base: str, required: list[str], stamp_dir: str | None = None) -> str:
     n, branch = pr["number"], pr["headRefName"]
     if pr["isDraft"]:
         raise Skip("PR đang draft")
@@ -187,7 +196,10 @@ def merge_open(pr: dict, base: str, required: list[str]) -> str:
     sha = pr["headRefOid"]
     if pr["mergeable"] == "CONFLICTING":
         sha = resolve_conflict(branch, base)
-    wait_ci(sha, required)
+    if stamp_dir:
+        check_stamp(stamp_dir, sha)
+    else:
+        wait_ci(sha, required)
     res = sh("gh", "pr", "merge", str(n), "--merge", "--delete-branch", "--match-head-commit", sha, check=False)
     if res.returncode != 0:
         raise Skip(f"gh pr merge lỗi (head đổi sau khi kiểm CI?): {res.stderr.strip()[:200]}")
@@ -217,6 +229,11 @@ def gate_checks(base: str) -> list[str]:
     return required
 
 
+def gate_stamp_dir(base: str) -> str | None:
+    """`merge.local_stamp_dir` on origin/<base>; call after `gate_checks` validated that file."""
+    return parse_local_stamp_dir(out("git", "show", f"origin/{base}:{CONFIG_NAME}"))
+
+
 def targets(args: list[str], base: str) -> list[int]:
     if args:
         return sorted({int(a.lstrip("#")) for a in args})
@@ -244,6 +261,7 @@ def main(argv: list[str]) -> int:
     sh("git", "fetch", "--prune", "origin")
     try:
         required = gate_checks(base)
+        stamp_dir = gate_stamp_dir(base)
     except ConfigError as e:
         print(f"Dừng: {e}")
         return 2
@@ -263,7 +281,7 @@ def main(argv: list[str]) -> int:
             continue
         print(f"#{n} {branch}: kiểm cổng…", file=sys.stderr, flush=True)
         try:
-            rows.append((n, branch, merge_open(pr, base, required), ""))
+            rows.append((n, branch, merge_open(pr, base, required, stamp_dir), ""))
             sh("git", "fetch", "origin", base)  # next PR may now conflict on BOARD
         except Skip as e:
             rows.append((n, branch, "bỏ qua", str(e)))

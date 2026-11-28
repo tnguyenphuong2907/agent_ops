@@ -9,6 +9,8 @@ Config: `.agent-ops.toml` at the project root, e.g.
     [merge]
     base = "main"                                     # default
     required_checks = []                              # check-run names a PR must have; merge_pr needs this key, even if empty
+    local_stamp_dir = "local-check"                   # optional, for projects without CI: instead of check runs,
+                                                      # merge_pr requires <git common dir>/<this>/<head sha>
 """
 from __future__ import annotations
 
@@ -75,7 +77,7 @@ def parse_merge_settings(text: str) -> tuple[str, list[str] | None]:
     section = config.get("merge", {})
     if not isinstance(section, dict):
         raise ConfigError(f"{CONFIG_NAME}: [merge] phải là bảng")
-    unknown = sorted(set(section) - {"base", "required_checks"})
+    unknown = sorted(set(section) - {"base", "required_checks", "local_stamp_dir"})
     if unknown:
         raise ConfigError(f"{CONFIG_NAME}: [merge] có khoá lạ: {', '.join(unknown)}")
     base = section.get("base", DEFAULT_BASE_BRANCH)
@@ -84,7 +86,15 @@ def parse_merge_settings(text: str) -> tuple[str, list[str] | None]:
         raise ConfigError(f"{CONFIG_NAME}: merge.base phải là chuỗi không rỗng")
     if checks is not None and (not isinstance(checks, list) or not all(isinstance(c, str) and c for c in checks)):
         raise ConfigError(f"{CONFIG_NAME}: merge.required_checks phải là danh sách tên check")
+    stamps = section.get("local_stamp_dir")
+    if stamps is not None and (not isinstance(stamps, str) or not stamps.strip()):
+        raise ConfigError(f"{CONFIG_NAME}: merge.local_stamp_dir phải là chuỗi không rỗng")
     return base.strip(), checks
+
+
+def parse_local_stamp_dir(text: str) -> str | None:
+    """`merge.local_stamp_dir` of a config text already accepted by `parse_merge_settings`."""
+    return tomllib.loads(text).get("merge", {}).get("local_stamp_dir")
 
 
 def mgmt_rel(root: Path | None = None) -> str:

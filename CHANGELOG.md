@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.3.1
+- `merge_pr.py`: optional `[merge] local_stamp_dir` gate (local check stamp instead of CI check runs).
+
 ## 0.3.0
 
 - Design self-check: `templates/design-selfcheck.md` (API H1–H7, UI M1–M6), subtask frontmatter `selfcheck:` and section `## Tự kiểm`.
